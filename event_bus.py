@@ -251,6 +251,7 @@ class EventBus:
         
         self._open_positions: Dict[str, dict] = {}
         self._trade_history: deque = deque(maxlen=self.MAX_TRADE_HISTORY)
+        self._total_trades_count: int = 0
         self._current_balance: Optional[dict] = None
         self._current_status: Optional[dict] = None
         self._last_ticks: Dict[str, dict] = {}
@@ -441,6 +442,8 @@ class EventBus:
                     
             elif event_type == "trade_history":
                 self._trade_history.append(event_dict)
+                self._total_trades_count += 1
+                event_dict["total_trades_count"] = self._total_trades_count
                 
             elif event_type == "balance_update":
                 self._current_balance = event_dict
@@ -466,6 +469,7 @@ class EventBus:
             return {
                 "open_positions": dict(self._open_positions),
                 "trade_history": list(self._trade_history),
+                "total_trades_count": self._total_trades_count,
                 "balance": self._current_balance,
                 "status": self._current_status,
                 "last_ticks": dict(self._last_ticks),
@@ -527,6 +531,7 @@ class EventBus:
         """Clear trade history (useful for session reset)."""
         with self._lock:
             self._trade_history.clear()
+            self._total_trades_count = 0
             logger.info("🧹 Trade history cleared")
     
     def clear_positions(self) -> None:
@@ -540,6 +545,7 @@ class EventBus:
         with self._lock:
             self._open_positions.clear()
             self._trade_history.clear()
+            self._total_trades_count = 0
             self._current_balance = None
             self._current_status = None
             self._last_ticks.clear()

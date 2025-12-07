@@ -9,6 +9,7 @@ class TradingDashboard {
         this.priceData = {};
         this.positions = {};
         this.tradeHistory = [];
+        this.totalTradesCount = 0;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
         this.reconnectDelay = 2000;
@@ -602,6 +603,7 @@ class TradingDashboard {
         
         if (snapshot.trade_history) {
             this.tradeHistory = snapshot.trade_history;
+            this.totalTradesCount = snapshot.total_trades_count || snapshot.trade_history.length;
             this.renderTradeHistory();
         }
         
@@ -729,6 +731,11 @@ class TradingDashboard {
     handleTradeEvent(data) {
         if (data.type === 'trade_history') {
             this.tradeHistory.push(data);
+            if (data.total_trades_count !== undefined) {
+                this.totalTradesCount = data.total_trades_count;
+            } else {
+                this.totalTradesCount++;
+            }
             if (this.tradeHistory.length > 200) {
                 this.tradeHistory.shift();
             }
@@ -807,9 +814,10 @@ class TradingDashboard {
     }
     
     updateStats() {
-        const totalTrades = this.tradeHistory.length;
+        const totalTrades = this.totalTradesCount;
         const wins = this.tradeHistory.filter(t => t.result.toLowerCase() === 'win').length;
-        const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(1) : 0;
+        const recentCount = this.tradeHistory.length;
+        const winRate = recentCount > 0 ? ((wins / recentCount) * 100).toFixed(1) : 0;
         const totalPnl = this.tradeHistory.reduce((sum, t) => sum + (t.profit || 0), 0);
         
         const totalEl = document.getElementById('total-trades');

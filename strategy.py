@@ -3759,3 +3759,5 @@ class SupportResistanceStrategy(TradingStrategy):
                 result.signal = Signal.SELL
                 result.confidence = min(score, 1.0)
                 result.reason = " | ".join(reasons)
+        
+        return result
