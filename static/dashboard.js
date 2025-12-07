@@ -18,6 +18,7 @@ class TradingDashboard {
         this.tickCount = 0;
         this.lastTickPrice = null;
         this.currentSignal = 'neutral';
+        this.tickPickerData = null;
         
         this.symbols = [
             'R_100', 'R_75', 'R_50', 'R_25', 'R_10',
@@ -638,7 +639,57 @@ class TradingDashboard {
                 break;
             case 'signal':
                 this.updateSignalIndicator(data);
+                if (data.tick_picker) {
+                    this.updateTickPicker(data.tick_picker);
+                }
                 break;
+        }
+    }
+    
+    updateTickPicker(data) {
+        this.tickPickerData = data;
+        
+        const windowSizeEl = document.getElementById('tick-window-size');
+        const upCountEl = document.getElementById('tick-up-count');
+        const upPctEl = document.getElementById('tick-up-pct');
+        const downCountEl = document.getElementById('tick-down-count');
+        const downPctEl = document.getElementById('tick-down-pct');
+        const signalEl = document.getElementById('tick-picker-signal');
+        
+        if (windowSizeEl) {
+            windowSizeEl.textContent = `Window: ${data.window_size || 50} ticks`;
+        }
+        
+        if (upCountEl) {
+            upCountEl.textContent = data.tick_up_count ?? 0;
+        }
+        
+        if (upPctEl) {
+            const upPct = typeof data.up_percentage === 'number' ? data.up_percentage : 50;
+            upPctEl.textContent = `${upPct.toFixed(1)}%`;
+        }
+        
+        if (downCountEl) {
+            downCountEl.textContent = data.tick_down_count ?? 0;
+        }
+        
+        if (downPctEl) {
+            const downPct = typeof data.down_percentage === 'number' ? data.down_percentage : 50;
+            downPctEl.textContent = `${downPct.toFixed(1)}%`;
+        }
+        
+        if (signalEl) {
+            const signal = data.signal_direction || 'WAIT';
+            signalEl.innerHTML = `<span>${signal}</span>`;
+            signalEl.classList.remove('call', 'put', 'wait');
+            
+            if (signal === 'CALL') {
+                signalEl.classList.add('call');
+            } else if (signal === 'PUT') {
+                signalEl.classList.add('put');
+            } else {
+                signalEl.classList.add('wait');
+            }
         }
     }
     

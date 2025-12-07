@@ -1537,17 +1537,32 @@ class TradingManager:
             tick_count = stats.get('tick_count', 0)
             
             if analysis.signal == Signal.WAIT:
+                # Prepare tick_picker data untuk dashboard
+                tick_picker_data = None
+                if analysis.tick_picker:
+                    tick_picker_data = {
+                        "tick_up_count": analysis.tick_picker.tick_up_count,
+                        "tick_down_count": analysis.tick_picker.tick_down_count,
+                        "total_analyzed": analysis.tick_picker.total_analyzed,
+                        "up_percentage": analysis.tick_picker.up_percentage,
+                        "down_percentage": analysis.tick_picker.down_percentage,
+                        "signal_direction": analysis.tick_picker.signal_direction,
+                        "signal_confidence": analysis.tick_picker.signal_confidence,
+                        "window_size": analysis.tick_picker.window_size
+                    }
+                
                 # Publish ANALYZING/WAIT signal untuk dashboard
                 signal_event = SignalEvent(
                     signal_type="WAIT",
                     symbol=self.symbol,
                     confidence=analysis.confidence,
-                    trend_direction=analysis.trend.upper() if analysis.trend else "SIDEWAYS",
+                    trend_direction=analysis.trend_direction.upper() if analysis.trend_direction else "SIDEWAYS",
                     tick_count=tick_count,
                     last_price=last_price,
                     reason=analysis.reason or "Menunggu sinyal...",
                     rsi_value=analysis.rsi_value,
-                    adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0
+                    adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0,
+                    tick_picker=tick_picker_data
                 )
                 get_event_bus().publish("signal", signal_event)
                 return
@@ -1558,18 +1573,33 @@ class TradingManager:
             
             contract_type = analysis.signal.value  # "CALL" atau "PUT"
             
+            # Prepare tick_picker data untuk dashboard
+            tick_picker_data = None
+            if analysis.tick_picker:
+                tick_picker_data = {
+                    "tick_up_count": analysis.tick_picker.tick_up_count,
+                    "tick_down_count": analysis.tick_picker.tick_down_count,
+                    "total_analyzed": analysis.tick_picker.total_analyzed,
+                    "up_percentage": analysis.tick_picker.up_percentage,
+                    "down_percentage": analysis.tick_picker.down_percentage,
+                    "signal_direction": analysis.tick_picker.signal_direction,
+                    "signal_confidence": analysis.tick_picker.signal_confidence,
+                    "window_size": analysis.tick_picker.window_size
+                }
+            
             # Publish BUY/SELL signal ke dashboard
             signal_type = "BUY" if contract_type == "CALL" else "SELL"
             signal_event = SignalEvent(
                 signal_type=signal_type,
                 symbol=self.symbol,
                 confidence=analysis.confidence,
-                trend_direction=analysis.trend.upper() if analysis.trend else "SIDEWAYS",
+                trend_direction=analysis.trend_direction.upper() if analysis.trend_direction else "SIDEWAYS",
                 tick_count=tick_count,
                 last_price=last_price,
                 reason=analysis.reason or f"Signal {signal_type}",
                 rsi_value=analysis.rsi_value,
-                adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0
+                adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0,
+                tick_picker=tick_picker_data
             )
             get_event_bus().publish("signal", signal_event)
             

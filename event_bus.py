@@ -219,10 +219,11 @@ class SignalEvent:
     reason: str = ""
     rsi_value: float = 50.0
     adx_value: float = 0.0
+    tick_picker: Optional[dict] = None
     timestamp: datetime = field(default_factory=datetime.now)
     
     def to_dict(self) -> dict:
-        return {
+        result = {
             "type": "signal",
             "signal_type": self.signal_type,
             "symbol": self.symbol,
@@ -235,6 +236,9 @@ class SignalEvent:
             "adx_value": self.adx_value,
             "timestamp": self.timestamp.isoformat()
         }
+        if self.tick_picker:
+            result["tick_picker"] = self.tick_picker
+        return result
 
 
 EventType = Union[
