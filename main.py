@@ -40,7 +40,7 @@ from telegram.ext import (
 )
 
 from deriv_ws import DerivWebSocket, AccountType
-from trading import TradingManager, TradingState
+from trading import TradingManager, TradingState, StrategyMode
 from pair_scanner import PairScanner
 from symbols import (
     SUPPORTED_SYMBOLS,
@@ -454,6 +454,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton(get_text("btn_status", lang), callback_data="menu_status"),
                 InlineKeyboardButton(get_text("btn_help", lang), callback_data="menu_help")
             ],
+            [InlineKeyboardButton("⚙️ Strategi", callback_data="menu_strategi")],
             [InlineKeyboardButton(get_text("btn_logout", lang), callback_data="confirm_logout")]
         ]
     else:
@@ -950,6 +951,76 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Gunakan `/start` terlebih dahulu."
         )
         await update.message.reply_text(error_text, parse_mode="Markdown")
+
+
+async def strategi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /strategi - Pilih strategi trading"""
+    global trading_manager
+    if not update.message or not update.effective_user:
+        return
+    
+    user_id = update.effective_user.id
+    lang = get_user_language(user_id, update.effective_user.language_code)
+    
+    if not auth_manager.is_authenticated(user_id):
+        await update.message.reply_text(
+            get_text("access_denied", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("📊 Multi-Indicator (RSI)", callback_data="strategy_multi")],
+        [InlineKeyboardButton("🎯 LDP (Last Digit)", callback_data="strategy_ldp")],
+        [InlineKeyboardButton("📈 Tick Analyzer", callback_data="strategy_tick")],
+        [InlineKeyboardButton("💰 Hybrid Money Manager", callback_data="strategy_hybrid")],
+        [InlineKeyboardButton("⬅️ Kembali", callback_data="menu_main")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    current_strategy = "Multi-Indicator"
+    if trading_manager:
+        current_strategy = trading_manager.strategy_mode.value.replace('_', ' ').title()
+    
+    await update.message.reply_text(
+        f"⚙️ **PILIH STRATEGI TRADING**\n\n"
+        f"Strategi aktif: *{current_strategy}*\n\n"
+        f"📊 *Multi-Indicator*: RSI + Trend (default)\n"
+        f"🎯 *LDP*: Prediksi digit terakhir\n"
+        f"📈 *Tick Analyzer*: Pattern tick\n"
+        f"💰 *Hybrid MM*: Money management aman\n\n"
+        f"Pilih strategi:",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
+async def ldp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /ldp - Info LDP Strategy"""
+    global trading_manager
+    if not update.message or not update.effective_user:
+        return
+    
+    user_id = update.effective_user.id
+    lang = get_user_language(user_id, update.effective_user.language_code)
+    
+    if not auth_manager.is_authenticated(user_id):
+        await update.message.reply_text(
+            get_text("access_denied", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    if not trading_manager:
+        await update.message.reply_text("❌ Trading manager belum siap.")
+        return
+    
+    info = trading_manager.get_strategy_info()
+    
+    await update.message.reply_text(
+        f"🎯 **INFO STRATEGI**\n\n{info}",
+        parse_mode="Markdown"
+    )
 
 
 async def whoami_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1744,6 +1815,60 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+    
+    elif data == "menu_strategi":
+        keyboard = [
+            [InlineKeyboardButton("📊 Multi-Indicator (RSI)", callback_data="strategy_multi")],
+            [InlineKeyboardButton("🎯 LDP (Last Digit)", callback_data="strategy_ldp")],
+            [InlineKeyboardButton("📈 Tick Analyzer", callback_data="strategy_tick")],
+            [InlineKeyboardButton("💰 Hybrid Money Manager", callback_data="strategy_hybrid")],
+            [InlineKeyboardButton("⬅️ Kembali", callback_data="menu_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        current_strategy = "Multi-Indicator"
+        if trading_manager:
+            current_strategy = trading_manager.strategy_mode.value.replace('_', ' ').title()
+        
+        await query.edit_message_text(
+            f"⚙️ **PILIH STRATEGI TRADING**\n\n"
+            f"Strategi aktif: *{current_strategy}*\n\n"
+            f"📊 *Multi-Indicator*: RSI + Trend (default)\n"
+            f"🎯 *LDP*: Prediksi digit terakhir\n"
+            f"📈 *Tick Analyzer*: Pattern tick\n"
+            f"💰 *Hybrid MM*: Money management aman\n\n"
+            f"Pilih strategi:",
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return
+    
+    elif data == "strategy_multi":
+        if trading_manager:
+            result = trading_manager.set_strategy_mode(StrategyMode.MULTI_INDICATOR)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+        return
+
+    elif data == "strategy_ldp":
+        if trading_manager:
+            result = trading_manager.set_strategy_mode(StrategyMode.LDP)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+        return
+
+    elif data == "strategy_tick":
+        if trading_manager:
+            result = trading_manager.set_strategy_mode(StrategyMode.TICK_ANALYZER)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+        return
+
+    elif data == "strategy_hybrid":
+        if trading_manager and deriv_ws and deriv_ws.account_info:
+            balance = deriv_ws.account_info.balance
+            result = trading_manager.enable_hybrid_money_manager(balance)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+        else:
+            await query.edit_message_text("❌ Tidak dapat mengaktifkan Hybrid MM. Cek koneksi.", parse_mode="Markdown")
+        return
         
     elif data == "akun_refresh":
         if deriv_ws and deriv_ws.account_info:
@@ -2332,6 +2457,8 @@ def main():
     app.add_handler(CommandHandler("reset_balance", reset_balance_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("strategy", strategy_command))
+    app.add_handler(CommandHandler("strategi", strategi_command))
+    app.add_handler(CommandHandler("ldp", ldp_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, token_message_handler))

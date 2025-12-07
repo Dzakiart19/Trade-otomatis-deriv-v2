@@ -45,6 +45,9 @@ from collections import deque
 
 from strategy import TradingStrategy, Signal, AnalysisResult, TrendFollowingStrategy, BollingerBandsStrategy, SupportResistanceStrategy
 from deriv_ws import DerivWebSocket, AccountType
+from ldp_strategy import LDPStrategy, LDPSignal, LDPAnalysisResult, LDPContractType
+from hybrid_money_manager import HybridMoneyManager, RiskLevel, create_small_capital_manager
+from tick_analyzer import TickTrendAnalyzer, TickSignal, TickDirection
 from symbols import (
     SUPPORTED_SYMBOLS, 
     DEFAULT_SYMBOL, 
@@ -73,6 +76,13 @@ class TradingState(Enum):
     PAUSED = "paused"
     WAITING_RESULT = "waiting_result"
     STOPPED = "stopped"
+
+
+class StrategyMode(Enum):
+    """Mode strategi trading"""
+    MULTI_INDICATOR = "multi_indicator"  # RSI-based (default)
+    LDP = "ldp"  # Last Digit Prediction
+    TICK_ANALYZER = "tick_analyzer"  # Tick pattern based
 
 
 @dataclass
@@ -355,6 +365,13 @@ class TradingManager:
         self.in_martingale_sequence: bool = False
         self.cumulative_loss: float = 0.0  # Track total losses in current sequence for recovery logging
         
+        # Strategy mode
+        self.strategy_mode: StrategyMode = StrategyMode.MULTI_INDICATOR
+        self.ldp_strategy: Optional[LDPStrategy] = None
+        self.tick_analyzer: Optional[TickTrendAnalyzer] = None
+        self.money_manager: Optional[HybridMoneyManager] = None
+        self.use_hybrid_money_manager: bool = False
+        
         # Callbacks untuk notifikasi Telegram
         self.on_trade_opened: Optional[Callable] = None
         self.on_trade_closed: Optional[Callable] = None
@@ -430,6 +447,46 @@ class TradingManager:
             Fixed multiplier value of 2.1x
         """
         return self.MARTINGALE_MULTIPLIER
+    
+    def set_strategy_mode(self, mode: StrategyMode) -> str:
+        """Switch strategy mode"""
+        self.strategy_mode = mode
+        
+        if mode == StrategyMode.LDP:
+            self.ldp_strategy = LDPStrategy()
+            logger.info("🎯 Strategy mode set to LDP (Last Digit Prediction)")
+            return "Strategi diubah ke LDP (Last Digit Prediction)"
+        elif mode == StrategyMode.TICK_ANALYZER:
+            self.tick_analyzer = TickTrendAnalyzer()
+            logger.info("📈 Strategy mode set to Tick Analyzer")
+            return "Strategi diubah ke Tick Analyzer"
+        else:
+            logger.info("📊 Strategy mode set to Multi-Indicator (default)")
+            return "Strategi diubah ke Multi-Indicator (default)"
+    
+    def enable_hybrid_money_manager(self, balance: float, stake: float = 0.35) -> str:
+        """Enable hybrid money manager for small capital"""
+        self.money_manager = create_small_capital_manager(balance, stake)
+        self.use_hybrid_money_manager = True
+        logger.info(f"💰 Hybrid Money Manager enabled for ${balance:.2f}")
+        return f"Hybrid Money Manager aktif untuk modal ${balance:.2f}"
+    
+    def get_strategy_info(self) -> str:
+        """Get current strategy information"""
+        info = [f"📊 Strategi Aktif: {self.strategy_mode.value.replace('_', ' ').title()}"]
+        
+        if self.use_hybrid_money_manager and self.money_manager:
+            info.append(self.money_manager.get_state_summary())
+        
+        if self.strategy_mode == StrategyMode.LDP and self.ldp_strategy:
+            stats = self.ldp_strategy.get_stats()
+            info.append(f"🎯 LDP Ticks: {stats['tick_count']}")
+            info.append(f"🔥 Hot digits: {stats['hot_digits']}")
+            info.append(f"❄️ Cold digits: {stats['cold_digits']}")
+        elif self.strategy_mode == StrategyMode.TICK_ANALYZER and self.tick_analyzer:
+            info.append(self.tick_analyzer.get_summary())
+        
+        return "\n".join(info)
         
     def _on_tick(self, price: float, symbol: str):
         """
@@ -875,28 +932,40 @@ class TradingManager:
                 self._complete_session()
                 return
             else:
-                # BALANCE GUARD: Get current balance BEFORE calculating next stake
-                current_balance = self.ws.get_balance()
-                multiplier = self._get_martingale_multiplier()
-                next_stake = round(self.current_stake * multiplier, 2)
-                
-                # Pre-check: Ensure next stake doesn't exceed balance
-                if next_stake > current_balance:
-                    logger.warning(f"⚠️ Martingale stake ${next_stake:.2f} melebihi balance ${current_balance:.2f}")
-                    if self.on_error:
-                        self.on_error(f"Trading dihentikan! Balance tidak cukup untuk Martingale (${next_stake:.2f} > ${current_balance:.2f})")
-                    self.analytics.record_martingale_result(recovered=False)
-                    self.is_processing_signal = False
-                    self.signal_processing_start_time = 0.0
-                    self._complete_session()
-                    return
-                
-                self.current_stake = next_stake
-                logger.info(
-                    f"📊 MARTINGALE Level {self.martingale_level}/{self.MAX_MARTINGALE_LEVEL}: "
-                    f"stake ${next_stake:.2f} (x{multiplier}) | "
-                    f"Cumulative Loss: ${self.cumulative_loss:.2f}"
-                )
+                # Use Hybrid Money Manager if enabled
+                if self.use_hybrid_money_manager and self.money_manager:
+                    calc = self.money_manager.calculate_stake()
+                    logger.info(f"💰 HybridMM stake: ${calc.stake:.2f} (L{calc.recovery_level})")
+                    next_stake = calc.stake
+                    self.current_stake = next_stake
+                    logger.info(
+                        f"📊 MARTINGALE Level {self.martingale_level}/{self.MAX_MARTINGALE_LEVEL}: "
+                        f"stake ${next_stake:.2f} (HybridMM) | "
+                        f"Cumulative Loss: ${self.cumulative_loss:.2f}"
+                    )
+                else:
+                    # BALANCE GUARD: Get current balance BEFORE calculating next stake
+                    current_balance = self.ws.get_balance()
+                    multiplier = self._get_martingale_multiplier()
+                    next_stake = round(self.current_stake * multiplier, 2)
+                    
+                    # Pre-check: Ensure next stake doesn't exceed balance
+                    if next_stake > current_balance:
+                        logger.warning(f"⚠️ Martingale stake ${next_stake:.2f} melebihi balance ${current_balance:.2f}")
+                        if self.on_error:
+                            self.on_error(f"Trading dihentikan! Balance tidak cukup untuk Martingale (${next_stake:.2f} > ${current_balance:.2f})")
+                        self.analytics.record_martingale_result(recovered=False)
+                        self.is_processing_signal = False
+                        self.signal_processing_start_time = 0.0
+                        self._complete_session()
+                        return
+                    
+                    self.current_stake = next_stake
+                    logger.info(
+                        f"📊 MARTINGALE Level {self.martingale_level}/{self.MAX_MARTINGALE_LEVEL}: "
+                        f"stake ${next_stake:.2f} (x{multiplier}) | "
+                        f"Cumulative Loss: ${self.cumulative_loss:.2f}"
+                    )
             
         # Notify via callback
         if self.on_trade_closed:
