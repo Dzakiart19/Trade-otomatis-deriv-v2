@@ -811,19 +811,19 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args if context.args else []
     
     if not args or args[0].lower() == "list":
-        await update.message.reply_text(
-            "📊 **STRATEGI TRADING TERSEDIA**\n\n"
-            "1. **multi_indicator** (Default)\n"
+        strategy_text = (
+            "📊 *STRATEGI TRADING TERSEDIA*\n\n"
+            "1\\. *multi\\_indicator* \\(Default\\)\n"
             "   RSI, EMA, MACD, Stochastic, ADX\n\n"
-            "2. **trend_following** (Baru!)\n"
+            "2\\. *trend\\_following* \\(Baru\\!\\)\n"
             "   Mengikuti trend dengan EMA & ADX\n\n"
-            "3. **bollinger_bands** (Baru!)\n"
+            "3\\. *bollinger\\_bands* \\(Baru\\!\\)\n"
             "   Trading breakout dari Bollinger Bands\n\n"
-            "4. **support_resistance** (Baru!)\n"
+            "4\\. *support\\_resistance* \\(Baru\\!\\)\n"
             "   Bounce dan breakout di level penting\n\n"
-            "Gunakan: `/strategy <nama_strategi>`",
-            parse_mode="Markdown"
+            "Gunakan: `/strategy <nama_strategi>`"
         )
+        await safe_send_message(update.message, strategy_text)
         return
     
     strategy_name = args[0].lower()
@@ -841,19 +841,19 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     valid_strategies = ["multi_indicator", "trend_following", "bollinger_bands", "support_resistance"]
     
     if strategy_name not in valid_strategies:
-        await update.message.reply_text(
-            f"❌ Strategi '{strategy_name}' tidak dikenal.\n\n"
-            f"Gunakan: `/strategy list` untuk melihat semua strategi.",
-            parse_mode="Markdown"
+        error_text = (
+            f"❌ Strategi '{strategy_name}' tidak dikenal\\.\n\n"
+            f"Gunakan: `/strategy list` untuk melihat semua strategi\\."
         )
+        await safe_send_message(update.message, error_text)
         return
     
     if trading_manager and trading_manager.state != TradingState.IDLE:
-        await update.message.reply_text(
+        warning_text = (
             "⚠️ Hentikan trading terlebih dahulu dengan `/stop`\n\n"
-            "Strategi hanya bisa diubah saat trading tidak aktif.",
-            parse_mode="Markdown"
+            "Strategi hanya bisa diubah saat trading tidak aktif\\."
         )
+        await safe_send_message(update.message, warning_text)
         return
     
     from trading import TradingManager
@@ -868,18 +868,21 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         emoji = emoji_map.get(strategy_name, "✅")
         
-        await update.message.reply_text(
-            f"{emoji} **Strategi diubah ke: {strategy_name.upper()}**\n\n"
-            f"Strategi baru sudah siap digunakan!\n"
-            f"Gunakan `/autotrade` untuk mulai trading.",
-            parse_mode="Markdown"
+        # Escape underscores for MarkdownV2
+        display_name = strategy_name.replace("_", "\\_")
+        
+        success_text = (
+            f"{emoji} *Strategi diubah ke: {display_name.upper()}*\n\n"
+            f"Strategi baru sudah siap digunakan\\!\n"
+            f"Gunakan `/autotrade` untuk mulai trading\\."
         )
+        await safe_send_message(update.message, success_text)
     else:
-        await update.message.reply_text(
-            "❌ WebSocket belum terkoneksi.\n\n"
-            "Gunakan `/start` terlebih dahulu.",
-            parse_mode="Markdown"
+        error_text = (
+            "❌ WebSocket belum terkoneksi\\.\n\n"
+            "Gunakan `/start` terlebih dahulu\\."
         )
+        await safe_send_message(update.message, error_text)
 
 
 async def whoami_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
