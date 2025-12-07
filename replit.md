@@ -119,7 +119,7 @@ Do not make changes to the file `Y`.
 
 ### Feature Specifications (v3.4)
 - **Supported Symbols**: Volatility indices (R_100, R_75, R_50, R_25, R_10, 1HZ100V, 1HZ75V, 1HZ50V) for 5-10 ticks duration, and frxXAUUSD (Gold/USD) for daily duration.
-- **Telegram Integration**: Provides interactive commands like `/start`, `/akun`, `/autotrade`, `/stop`, `/status`, `/strategy`, and `/help`.
+- **Telegram Integration**: Provides interactive commands like `/start`, `/akun`, `/autotrade`, `/stop`, `/status`, `/strategy`, `/reset_balance`, and `/help`.
 - **Session Management**: Configurable target number of trades with auto-stop functionality.
 - **Multi-Strategy Support (Baru v3.4)**:
   1. **Multi-Indicator Strategy** (Default) - RSI, EMA, MACD, Stochastic, ADX dengan multi-factor confluence scoring
