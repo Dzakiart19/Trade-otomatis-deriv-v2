@@ -362,6 +362,12 @@ class TradingManager:
         self.on_error: Optional[Callable] = None
         self.on_progress: Optional[Callable] = None
         
+        # Stop requested flag - defers session reset until pending trade settles
+        self.stop_requested: bool = False
+        
+        # Store last session summary for retrieval after finalization
+        self.last_session_summary: str = ""
+        
         # Progress tracking
         self.tick_count: int = 0
         self.progress_interval: int = 5
@@ -440,6 +446,16 @@ class TradingManager:
             if self._check_buy_timeout():
                 logger.info("🔄 Buy timeout handled, continuing to next tick")
                 return
+        
+        # EDGE CASE: Handle stop requested but trade might have been cleared by other means
+        # If state is STOPPED and stop_requested is True but no pending contract, finalize now
+        if self.state == TradingState.STOPPED and self.stop_requested and not self.current_contract_id:
+            logger.info("🔄 Edge case detected: stop_requested but no pending contract. Finalizing stop...")
+            summary = self._finalize_stop()
+            # Notify user with session summary (pushed via callback)
+            if summary and self.on_session_complete:
+                self.on_session_complete(summary)
+            return
         
         # Jika sedang dalam posisi, tidak perlu analisis
         if self.state == TradingState.WAITING_RESULT:
@@ -932,6 +948,12 @@ class TradingManager:
             logger.info("🛑 State is STOPPED (manual stop), tidak membuka trade baru")
             self.current_contract_id = None
             self.current_trade_type = None
+            # Now that trade is processed with correct metadata, finalize the stop
+            if self.stop_requested:
+                summary = self._finalize_stop()
+                # Notify user with session summary (pushed via callback)
+                if self.on_session_complete:
+                    self.on_session_complete(summary)
         else:
             # Reset state untuk trade berikutnya
             self.state = TradingState.RUNNING
@@ -1971,14 +1993,30 @@ class TradingManager:
         """
         Hentikan auto trading.
         
+        REFACTORED: stop() is now minimal - only sets flags and state.
+        All summary/save/cleanup operations are deferred to _finalize_stop()
+        which runs after any pending trade settles to ensure stats are complete.
+        
         Returns:
-            Pesan ringkasan session
+            Pesan status stop
         """
-        if self.state == TradingState.IDLE or self.state == TradingState.STOPPED:
+        if self.state == TradingState.IDLE:
             return "⚠️ Auto trading tidak sedang berjalan."
+        
+        # Check if stop already in progress (waiting for trade to settle)
+        if self.state == TradingState.STOPPED and self.stop_requested:
+            return "⏳ Stop sudah dalam proses, menunggu trade aktif selesai..."
             
+        if self.state == TradingState.STOPPED:
+            return "⚠️ Auto trading sudah dihentikan."
+            
+        # === MINIMAL STOP: Only set flags and state ===
+        
         # Unsubscribe dari ticks untuk symbol yang sedang di-trade
         self.ws.unsubscribe_ticks(self.symbol)
+        
+        # Set stop_requested flag - session reset will be deferred until pending trade settles
+        self.stop_requested = True
         
         # Update state
         self.state = TradingState.STOPPED
@@ -1987,20 +2025,55 @@ class TradingManager:
         self.is_processing_signal = False
         self.signal_processing_start_time = 0.0
         
-        # CRITICAL: Reset contract tracking to prevent "waiting for contract" bug
-        self.current_contract_id = None
-        self.current_trade_type = None
+        # Check if there's a pending trade (contract_id still set)
+        if self.current_contract_id:
+            # Pending trade exists - DO NOT call any summary/save functions yet
+            # _finalize_stop() will be called from _process_trade_result after trade settles
+            logger.info(f"🛑 Stop requested with active trade (contract: {self.current_contract_id}). Waiting for trade to settle...")
+            return (
+                "🛑 **STOPPING...**\n\n"
+                "⏳ Menunggu trade aktif selesai...\n"
+                f"Contract ID: {self.current_contract_id}\n\n"
+                "_Summary lengkap akan dikirim setelah trade settle._"
+            )
+        else:
+            # No pending trade, finalize immediately
+            # _finalize_stop() will handle all summary/save/cleanup operations
+            return self._finalize_stop()
+    
+    def _finalize_stop(self) -> str:
+        """
+        Finalize the stop - handle all summary/save/cleanup operations then reset state.
+        Called after any pending trade settles to ensure stats are complete.
         
-        # Save session summary
+        Returns:
+            Session summary string
+        """
+        # Guard: Prevent double finalization
+        if not self.stop_requested:
+            logger.debug("_finalize_stop called but stop_requested is False, already finalized")
+            return self.last_session_summary if hasattr(self, 'last_session_summary') else ""
+        
+        logger.info("🏁 Finalizing stop - generating summary with complete stats...")
+        
+        # === STEP 1: Generate summary FIRST (while stats are still intact) ===
+        summary = self._generate_session_summary()
+        self.last_session_summary = summary  # Store for later retrieval if needed
+        
+        # === STEP 2: Save session summary to file ===
         self._save_session_summary()
         
-        # Generate summary BEFORE reset
-        summary = self._generate_session_summary()
-        
-        # Cleanup old log files untuk hemat penyimpanan
+        # === STEP 3: Cleanup old log files ===
         self._cleanup_session_logs()
         
-        # Reset ALL state untuk session baru yang bersih
+        # === STEP 4: Clear session recovery file ===
+        self._clear_session_recovery()
+        
+        # === STEP 5: Log the summary before reset ===
+        logger.info(f"📊 Final session stats: trades={self.stats.total_trades}, wins={self.stats.wins}, losses={self.stats.losses}, profit=${self.stats.total_profit:.2f}")
+        
+        # === STEP 6: Reset all session state ===
+        
         # Reset martingale state
         self.martingale_level = 0
         self.in_martingale_sequence = False
@@ -2028,8 +2101,11 @@ class TradingManager:
         self.buy_failure_times = []
         self.circuit_breaker_active = False
         
-        # CRITICAL: Broadcast PositionsResetEvent lalu clear dari EventBus
-        # Ini diperlukan agar dashboard WebSocket clients clear semua posisi tanpa merusak analytics
+        # Reset contract tracking
+        self.current_contract_id = None
+        self.current_trade_type = None
+        
+        # === STEP 7: Broadcast positions reset ===
         try:
             bus = get_event_bus()
             bus.publish("position", PositionsResetEvent(reason="stop"))
@@ -2037,6 +2113,11 @@ class TradingManager:
             logger.info("🧹 Broadcast positions reset and cleared EventBus")
         except Exception as e:
             logger.error(f"Error clearing positions from EventBus: {e}")
+        
+        # === STEP 8: Clear stop_requested flag (marks finalization complete) ===
+        self.stop_requested = False
+        
+        logger.info("✅ Stop finalized - session state reset complete")
         
         return summary
         

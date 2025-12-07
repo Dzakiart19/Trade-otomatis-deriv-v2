@@ -827,6 +827,17 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     strategy_name = args[0].lower()
+    
+    # Normalize strategy name: add underscores if missing
+    name_mappings = {
+        "multiindicator": "multi_indicator",
+        "trendfollowing": "trend_following",
+        "bollingerbands": "bollinger_bands",
+        "supportresistance": "support_resistance"
+    }
+    if strategy_name in name_mappings:
+        strategy_name = name_mappings[strategy_name]
+    
     valid_strategies = ["multi_indicator", "trend_following", "bollinger_bands", "support_resistance"]
     
     if strategy_name not in valid_strategies:
