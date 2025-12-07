@@ -15,6 +15,9 @@ class TradingDashboard {
         this.reconnectDelay = 2000;
         this.authToken = null;
         this.pendingEntryMarkers = {};
+        this.tickCount = 0;
+        this.lastTickPrice = null;
+        this.currentSignal = 'neutral';
         
         this.symbols = [
             'R_100', 'R_75', 'R_50', 'R_25', 'R_10',
@@ -633,6 +636,84 @@ class TradingDashboard {
             case 'status':
                 this.updateTradingStatus(data);
                 break;
+            case 'signal':
+                this.updateSignalIndicator(data);
+                break;
+        }
+    }
+    
+    updateSignalIndicator(data) {
+        const signalEl = document.getElementById('signal');
+        const signalIcon = signalEl?.querySelector('.signal-icon');
+        const signalText = signalEl?.querySelector('.signal-text');
+        const trendDetails = document.getElementById('trend-details');
+        
+        if (!signalEl || !signalIcon || !signalText) return;
+        
+        const signalType = (data.signal || data.type || 'neutral').toLowerCase();
+        this.currentSignal = signalType;
+        
+        signalEl.classList.remove('neutral', 'buy', 'sell');
+        signalEl.classList.add(signalType);
+        
+        switch (signalType) {
+            case 'buy':
+            case 'call':
+                signalEl.classList.remove('neutral', 'sell');
+                signalEl.classList.add('buy');
+                signalIcon.textContent = '📈';
+                signalText.textContent = 'BUY';
+                break;
+            case 'sell':
+            case 'put':
+                signalEl.classList.remove('neutral', 'buy');
+                signalEl.classList.add('sell');
+                signalIcon.textContent = '📉';
+                signalText.textContent = 'SELL';
+                break;
+            default:
+                signalEl.classList.remove('buy', 'sell');
+                signalEl.classList.add('neutral');
+                signalIcon.textContent = '⏳';
+                signalText.textContent = 'Analyzing...';
+        }
+        
+        if (trendDetails) {
+            trendDetails.classList.remove('uptrend', 'downtrend');
+            
+            if (data.trend) {
+                trendDetails.textContent = data.trend;
+                if (data.trend.toLowerCase().includes('up') || data.trend.toLowerCase().includes('bullish')) {
+                    trendDetails.classList.add('uptrend');
+                } else if (data.trend.toLowerCase().includes('down') || data.trend.toLowerCase().includes('bearish')) {
+                    trendDetails.classList.add('downtrend');
+                }
+            } else if (data.symbol) {
+                const trendText = signalType === 'buy' || signalType === 'call' 
+                    ? `Uptrend detected on ${data.symbol}`
+                    : signalType === 'sell' || signalType === 'put'
+                    ? `Downtrend detected on ${data.symbol}`
+                    : 'No active trend detected';
+                trendDetails.textContent = trendText;
+                
+                if (signalType === 'buy' || signalType === 'call') {
+                    trendDetails.classList.add('uptrend');
+                } else if (signalType === 'sell' || signalType === 'put') {
+                    trendDetails.classList.add('downtrend');
+                }
+            } else {
+                trendDetails.textContent = 'No active trend detected';
+            }
+        }
+    }
+    
+    updateTickCounter(symbol, price) {
+        this.tickCount++;
+        this.lastTickPrice = price;
+        
+        const tickCounterEl = document.getElementById('tick-counter');
+        if (tickCounterEl) {
+            tickCounterEl.textContent = `Ticks: ${this.tickCount} | Last: ${price.toFixed(2)}`;
         }
     }
     
@@ -643,6 +724,8 @@ class TradingDashboard {
         const data = this.priceData[symbol];
         const price = tick.price;
         const time = new Date(tick.timestamp || Date.now()).toLocaleTimeString();
+        
+        this.updateTickCounter(symbol, price);
         
         data.labels.push(time);
         data.prices.push(price);

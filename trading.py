@@ -56,7 +56,7 @@ from symbols import (
 import csv
 import os
 
-from event_bus import get_event_bus, PositionOpenEvent, PositionCloseEvent, PositionsResetEvent, TradeHistoryEvent, StatusEvent
+from event_bus import get_event_bus, PositionOpenEvent, PositionCloseEvent, PositionsResetEvent, TradeHistoryEvent, StatusEvent, SignalEvent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1531,8 +1531,25 @@ class TradingManager:
             # Dapatkan analisis dari strategy
             analysis = self.strategy.analyze()
             
+            # Publish SignalEvent ke dashboard untuk tick-picker display
+            stats = self.strategy.get_stats()
+            last_price = stats.get('last_tick', 0.0)
+            tick_count = stats.get('tick_count', 0)
+            
             if analysis.signal == Signal.WAIT:
-                # Tidak ada signal, lanjut menunggu
+                # Publish ANALYZING/WAIT signal untuk dashboard
+                signal_event = SignalEvent(
+                    signal_type="WAIT",
+                    symbol=self.symbol,
+                    confidence=analysis.confidence,
+                    trend_direction=analysis.trend.upper() if analysis.trend else "SIDEWAYS",
+                    tick_count=tick_count,
+                    last_price=last_price,
+                    reason=analysis.reason or "Menunggu sinyal...",
+                    rsi_value=analysis.rsi_value,
+                    adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0
+                )
+                get_event_bus().publish("signal", signal_event)
                 return
                 
             # Ada signal! Set flag processing SEBELUM eksekusi (inside lock)
@@ -1540,6 +1557,21 @@ class TradingManager:
             self.signal_processing_start_time = time_module.time()
             
             contract_type = analysis.signal.value  # "CALL" atau "PUT"
+            
+            # Publish BUY/SELL signal ke dashboard
+            signal_type = "BUY" if contract_type == "CALL" else "SELL"
+            signal_event = SignalEvent(
+                signal_type=signal_type,
+                symbol=self.symbol,
+                confidence=analysis.confidence,
+                trend_direction=analysis.trend.upper() if analysis.trend else "SIDEWAYS",
+                tick_count=tick_count,
+                last_price=last_price,
+                reason=analysis.reason or f"Signal {signal_type}",
+                rsi_value=analysis.rsi_value,
+                adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0
+            )
+            get_event_bus().publish("signal", signal_event)
             
             logger.info(f"📊 Signal: {contract_type} | RSI: {analysis.rsi_value} | "
                        f"Confidence: {analysis.confidence:.2f} | Reason: {analysis.reason}")

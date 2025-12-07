@@ -169,6 +169,100 @@ section h2 {
     letter-spacing: -0.01em;
 }
 
+#signal-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--spacing-md);
+}
+
+#signal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    min-width: 200px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+}
+
+#signal.neutral {
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    color: #000;
+}
+
+#signal.buy {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: #fff;
+    animation: signal-pulse 1.5s ease-in-out infinite;
+}
+
+#signal.sell {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    color: #fff;
+    animation: signal-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes signal-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: var(--shadow-md);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.25);
+    }
+}
+
+.signal-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.signal-icon {
+    font-size: 1.5rem;
+}
+
+.signal-text {
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tick-analysis-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+    border: 1px solid var(--border-color);
+}
+
+#trend-details {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+#trend-details.uptrend {
+    color: var(--accent-green);
+}
+
+#trend-details.downtrend {
+    color: var(--accent-red);
+}
+
+#tick-counter {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -695,6 +789,30 @@ section h2 {
     .balance-display,
     .trading-status {
         padding: 6px var(--spacing-sm);
+        font-size: 0.8125rem;
+    }
+
+    #signal {
+        padding: var(--spacing-sm) var(--spacing-md);
+        min-width: 150px;
+    }
+
+    .signal-icon {
+        font-size: 1.25rem;
+    }
+
+    .signal-text {
+        font-size: 1rem;
+    }
+
+    .tick-analysis-info {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        text-align: center;
+    }
+
+    #trend-details,
+    #tick-counter {
         font-size: 0.8125rem;
     }
 

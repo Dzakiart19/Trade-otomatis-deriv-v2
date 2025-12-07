@@ -34,6 +34,18 @@
         <div class="dashboard-grid">
             <section class="charts-section">
                 <h2>Live Price Charts</h2>
+                <div id="signal-container">
+                    <div id="signal" class="neutral">
+                        <div class="signal-content">
+                            <span class="signal-icon">⏳</span>
+                            <span class="signal-text">Analyzing...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="tick-analysis-info">
+                    <span id="trend-details">No active trend detected</span>
+                    <span id="tick-counter">Ticks: 0 | Last: --</span>
+                </div>
                 <div class="charts-grid" id="charts-grid">
                     <div class="chart-card" data-symbol="R_100">
                         <div class="chart-header">

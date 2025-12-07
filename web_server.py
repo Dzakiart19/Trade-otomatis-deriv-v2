@@ -260,7 +260,7 @@ class ConnectionManager:
         self._running = True
         bus = get_event_bus()
         
-        channels = ["tick", "position", "trade", "balance", "status"]
+        channels = ["tick", "position", "trade", "balance", "status", "signal"]
         for channel in channels:
             task = asyncio.create_task(self._forward_channel(bus, channel))
             self._event_tasks.append(task)

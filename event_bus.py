@@ -54,6 +54,7 @@ class Channel(str, Enum):
     TRADE = "trade"
     BALANCE = "balance"
     STATUS = "status"
+    SIGNAL = "signal"
 
 
 @dataclass
@@ -206,6 +207,36 @@ class StatusEvent:
         }
 
 
+@dataclass
+class SignalEvent:
+    """Trading signal analysis event for tick-picker display"""
+    signal_type: str  # "BUY", "SELL", "WAIT", "ANALYZING"
+    symbol: str
+    confidence: float
+    trend_direction: str  # "UP", "DOWN", "SIDEWAYS"
+    tick_count: int
+    last_price: float
+    reason: str = ""
+    rsi_value: float = 50.0
+    adx_value: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.now)
+    
+    def to_dict(self) -> dict:
+        return {
+            "type": "signal",
+            "signal_type": self.signal_type,
+            "symbol": self.symbol,
+            "confidence": self.confidence,
+            "trend_direction": self.trend_direction,
+            "tick_count": self.tick_count,
+            "last_price": self.last_price,
+            "reason": self.reason,
+            "rsi_value": self.rsi_value,
+            "adx_value": self.adx_value,
+            "timestamp": self.timestamp.isoformat()
+        }
+
+
 EventType = Union[
     TickEvent, 
     PositionOpenEvent, 
@@ -214,7 +245,8 @@ EventType = Union[
     PositionsResetEvent,
     BalanceUpdateEvent,
     TradeHistoryEvent,
-    StatusEvent
+    StatusEvent,
+    SignalEvent
 ]
 
 
@@ -239,7 +271,7 @@ class EventBus:
     
     MAX_TRADE_HISTORY = 200
     QUEUE_MAX_SIZE = 1000
-    VALID_CHANNELS = {"tick", "position", "trade", "balance", "status"}
+    VALID_CHANNELS = {"tick", "position", "trade", "balance", "status", "signal"}
     
     def __init__(self):
         """Initialize the event bus with empty state."""
