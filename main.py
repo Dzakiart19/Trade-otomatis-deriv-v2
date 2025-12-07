@@ -812,18 +812,18 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not args or args[0].lower() == "list":
         strategy_text = (
-            "📊 *STRATEGI TRADING TERSEDIA*\n\n"
-            "1\\. *multi\\_indicator* \\(Default\\)\n"
+            "📊 **STRATEGI TRADING TERSEDIA**\n\n"
+            "1. **multi_indicator** (Default)\n"
             "   RSI, EMA, MACD, Stochastic, ADX\n\n"
-            "2\\. *trend\\_following* \\(Baru\\!\\)\n"
+            "2. **trend_following** (Baru!)\n"
             "   Mengikuti trend dengan EMA & ADX\n\n"
-            "3\\. *bollinger\\_bands* \\(Baru\\!\\)\n"
+            "3. **bollinger_bands** (Baru!)\n"
             "   Trading breakout dari Bollinger Bands\n\n"
-            "4\\. *support\\_resistance* \\(Baru\\!\\)\n"
+            "4. **support_resistance** (Baru!)\n"
             "   Bounce dan breakout di level penting\n\n"
             "Gunakan: `/strategy <nama_strategi>`"
         )
-        await safe_send_message(update.message, strategy_text)
+        await update.message.reply_text(strategy_text, parse_mode="Markdown")
         return
     
     strategy_name = args[0].lower()
@@ -842,23 +842,28 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if strategy_name not in valid_strategies:
         error_text = (
-            f"❌ Strategi '{strategy_name}' tidak dikenal\\.\n\n"
-            f"Gunakan: `/strategy list` untuk melihat semua strategi\\."
+            f"❌ Strategi '{strategy_name}' tidak dikenal.\n\n"
+            f"Gunakan: `/strategy list` untuk melihat semua strategi."
         )
-        await safe_send_message(update.message, error_text)
+        await update.message.reply_text(error_text, parse_mode="Markdown")
         return
     
     if trading_manager and trading_manager.state != TradingState.IDLE:
         warning_text = (
             "⚠️ Hentikan trading terlebih dahulu dengan `/stop`\n\n"
-            "Strategi hanya bisa diubah saat trading tidak aktif\\."
+            "Strategi hanya bisa diubah saat trading tidak aktif."
         )
-        await safe_send_message(update.message, warning_text)
+        await update.message.reply_text(warning_text, parse_mode="Markdown")
         return
     
     from trading import TradingManager
     if deriv_ws:
         trading_manager = TradingManager(deriv_ws, strategy_type=strategy_name)
+        
+        telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        if telegram_token:
+            setup_trading_callbacks(telegram_token)
+            logger.info(f"✅ Trading callbacks re-configured after strategy change to {strategy_name}")
         
         emoji_map = {
             "multi_indicator": "📊",
@@ -868,21 +873,20 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         emoji = emoji_map.get(strategy_name, "✅")
         
-        # Escape underscores for MarkdownV2
-        display_name = strategy_name.replace("_", "\\_")
+        display_name = strategy_name.replace("_", " ").title()
         
         success_text = (
-            f"{emoji} *Strategi diubah ke: {display_name.upper()}*\n\n"
-            f"Strategi baru sudah siap digunakan\\!\n"
-            f"Gunakan `/autotrade` untuk mulai trading\\."
+            f"{emoji} **Strategi diubah ke: {display_name}**\n\n"
+            f"Strategi baru sudah siap digunakan!\n"
+            f"Gunakan `/autotrade` untuk mulai trading."
         )
-        await safe_send_message(update.message, success_text)
+        await update.message.reply_text(success_text, parse_mode="Markdown")
     else:
         error_text = (
-            "❌ WebSocket belum terkoneksi\\.\n\n"
-            "Gunakan `/start` terlebih dahulu\\."
+            "❌ WebSocket belum terkoneksi.\n\n"
+            "Gunakan `/start` terlebih dahulu."
         )
-        await safe_send_message(update.message, error_text)
+        await update.message.reply_text(error_text, parse_mode="Markdown")
 
 
 async def whoami_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
