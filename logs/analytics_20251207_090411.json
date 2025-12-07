@@ -1,0 +1,35 @@
+{
+  "export_time": "2025-12-07T09:04:11.100499",
+  "rolling_win_rate": 40.0,
+  "max_drawdown": 29.509999999999998,
+  "peak_balance": 32.98,
+  "martingale_recoveries": 26,
+  "martingale_failures": 1,
+  "hourly_profits": {
+    "2025-12-07 08:00": 9.730000000000013,
+    "2025-12-07 09:00": -16.259999999999998
+  },
+  "rsi_performance": {
+    "90-100": {
+      "wins": 1,
+      "losses": 0,
+      "profit": 0.46
+    },
+    "50-60": {
+      "wins": 31,
+      "losses": 31,
+      "profit": -12.849999999999994
+    },
+    "40-50": {
+      "wins": 30,
+      "losses": 19,
+      "profit": 5.910000000000002
+    },
+    "60-70": {
+      "wins": 1,
+      "losses": 1,
+      "profit": -0.050000000000000044
+    }
+  },
+  "trade_count": 100
+}

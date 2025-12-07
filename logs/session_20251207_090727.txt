@@ -1,0 +1,25 @@
+==================================================
+SESSION SUMMARY
+==================================================
+
+Timestamp: 2025-12-07 09:07:27
+Symbol: R_100
+Base Stake: $0.5
+
+STATISTICS:
+  Total Trades: 6
+  Wins: 1
+  Losses: 5
+  Win Rate: 16.7%
+
+BALANCE:
+  Starting: $10.00
+  Ending: $2.95
+  Highest: $10.45
+  Lowest: $2.95
+  Net P/L: $-7.05
+
+RISK METRICS:
+  Max Consecutive Losses: 0
+  Daily Loss: $8.00
+==================================================
