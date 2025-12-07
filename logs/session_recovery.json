@@ -1,0 +1,25 @@
+{
+  "save_timestamp": 1765092225.1075306,
+  "save_datetime": "2025-12-07T07:23:45.107531",
+  "symbol": "R_10",
+  "base_stake": 0.5,
+  "current_stake": 0.5,
+  "duration": 5,
+  "duration_unit": "t",
+  "target_trades": 0,
+  "stats": {
+    "total_trades": 15,
+    "wins": 10,
+    "losses": 5,
+    "total_profit": 4.43,
+    "starting_balance": 18.97,
+    "current_balance": 23.4,
+    "highest_balance": 23.4,
+    "lowest_balance": 11.47
+  },
+  "martingale_level": 0,
+  "in_martingale_sequence": false,
+  "consecutive_losses": 0,
+  "daily_loss": 4.5,
+  "session_start_date": "2025-12-07"
+}
