@@ -926,6 +926,12 @@ class TradingManager:
         # Cek apakah target tercapai
         if self.target_trades > 0 and self.stats.total_trades >= self.target_trades:
             self._complete_session()
+        elif self.state == TradingState.STOPPED:
+            # CRITICAL FIX: Jika sudah di-STOP manual, JANGAN override state!
+            # Ini mencegah trade baru dibuka setelah /stop dipanggil
+            logger.info("🛑 State is STOPPED (manual stop), tidak membuka trade baru")
+            self.current_contract_id = None
+            self.current_trade_type = None
         else:
             # Reset state untuk trade berikutnya
             self.state = TradingState.RUNNING
