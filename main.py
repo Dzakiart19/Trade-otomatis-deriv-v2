@@ -632,6 +632,69 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(result, parse_mode="Markdown")
 
 
+async def reset_balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /reset_balance - Top up demo account balance"""
+    global deriv_ws
+    if not update.message or not update.effective_user:
+        return
+    
+    user_id = update.effective_user.id
+    lang = get_user_language(user_id, update.effective_user.language_code)
+    
+    if not auth_manager.is_authenticated(user_id):
+        await update.message.reply_text(
+            get_text("access_denied", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    if not deriv_ws or not deriv_ws.is_ready():
+        await update.message.reply_text(
+            get_text("ws_not_connected", lang)
+        )
+        return
+    
+    if not deriv_ws.account_info or not deriv_ws.account_info.is_virtual:
+        await update.message.reply_text(
+            "❌ **RESET BALANCE DITOLAK**\n\n"
+            "Fitur ini hanya tersedia untuk akun **DEMO**.\n"
+            "Akun REAL tidak dapat di-top up.\n\n"
+            "Gunakan /akun untuk melihat tipe akun Anda.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    await update.message.reply_text(
+        "⏳ Memproses top-up saldo demo...",
+        parse_mode="Markdown"
+    )
+    
+    import asyncio
+    loop = asyncio.get_event_loop()
+    success, new_balance, message = await loop.run_in_executor(
+        None, deriv_ws.topup_virtual
+    )
+    
+    if success:
+        balance_idr = new_balance * USD_TO_IDR
+        await update.message.reply_text(
+            f"✅ **TOP-UP BERHASIL**\n\n"
+            f"💰 Saldo baru: **${new_balance:,.2f}**\n"
+            f"💵 Setara: Rp {balance_idr:,.0f}\n\n"
+            f"ℹ️ Deriv menambahkan $10,000 USD per top-up.\n"
+            f"Jika limit tercapai, tunggu beberapa saat.",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            f"❌ **TOP-UP GAGAL**\n\n"
+            f"📝 {message}\n\n"
+            f"ℹ️ Deriv memiliki limit top-up harian.\n"
+            f"Coba lagi nanti jika limit tercapai.",
+            parse_mode="Markdown"
+        )
+
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /status"""
     global deriv_ws, trading_manager
@@ -2266,6 +2329,7 @@ def main():
     app.add_handler(CommandHandler("akun", akun_command))
     app.add_handler(CommandHandler("autotrade", autotrade_command))
     app.add_handler(CommandHandler("stop", stop_command))
+    app.add_handler(CommandHandler("reset_balance", reset_balance_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("strategy", strategy_command))
     app.add_handler(CommandHandler("help", help_command))

@@ -1271,6 +1271,96 @@ class DerivWebSocket:
     def get_last_auth_error(self) -> str:
         """Dapatkan pesan error terakhir saat authorization"""
         return self._last_auth_error
+    
+    def topup_virtual(self, timeout: float = 15.0) -> tuple:
+        """
+        Top up virtual/demo account balance.
+        
+        Deriv API adds a fixed amount of $10,000 USD per top-up.
+        This only works for virtual (demo) accounts.
+        
+        Args:
+            timeout: Timeout in seconds to wait for response
+            
+        Returns:
+            Tuple of (success: bool, new_balance: float, message: str)
+            
+        Example:
+            success, balance, msg = ws.topup_virtual()
+            if success:
+                print(f"New balance: ${balance}")
+            else:
+                print(f"Failed: {msg}")
+        """
+        if not self.is_ready():
+            return (False, 0.0, "WebSocket not ready")
+        
+        if not self.account_info:
+            return (False, 0.0, "Account info not available")
+        
+        if not self.account_info.is_virtual:
+            return (False, 0.0, "Top-up only available for demo/virtual accounts")
+        
+        topup_event = threading.Event()
+        topup_result = {"success": False, "balance": 0.0, "message": ""}
+        
+        def handle_topup_response(data: dict):
+            if "error" in data:
+                error_info = data.get("error", {})
+                error_code = error_info.get("code", "unknown")
+                error_msg = error_info.get("message", "Unknown error")
+                topup_result["success"] = False
+                topup_result["message"] = f"[{error_code}] {error_msg}"
+            elif "topup_virtual" in data:
+                topup_data = data.get("topup_virtual", {})
+                new_balance = float(topup_data.get("balance", 0))
+                currency = topup_data.get("currency", "USD")
+                topup_result["success"] = True
+                topup_result["balance"] = new_balance
+                topup_result["message"] = f"Balance topped up to {new_balance} {currency}"
+                if self.account_info:
+                    self.account_info.balance = new_balance
+                logger.info(f"💰 Virtual account topped up: {new_balance} {currency}")
+            topup_event.set()
+        
+        original_on_message = self._on_message
+        
+        def patched_on_message(ws, message):
+            try:
+                data = json.loads(message)
+                msg_type = data.get("msg_type", "")
+                
+                if msg_type == "topup_virtual" or (
+                    "error" in data and 
+                    data.get("echo_req", {}).get("topup_virtual") == 1
+                ):
+                    handle_topup_response(data)
+                    return
+            except json.JSONDecodeError:
+                pass
+            original_on_message(ws, message)
+        
+        self.ws.on_message = patched_on_message
+        
+        try:
+            payload = {"topup_virtual": 1}
+            success = self._send(payload)
+            
+            if not success:
+                return (False, 0.0, "Failed to send topup request")
+            
+            logger.info("📤 Requesting virtual account top-up...")
+            
+            if topup_event.wait(timeout):
+                return (
+                    topup_result["success"],
+                    topup_result["balance"],
+                    topup_result["message"]
+                )
+            else:
+                return (False, 0.0, f"Timeout after {timeout}s waiting for topup response")
+        finally:
+            self.ws.on_message = original_on_message
         
     def wait_until_ready(self, timeout: int = 30) -> bool:
         """
