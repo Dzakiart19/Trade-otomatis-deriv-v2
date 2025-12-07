@@ -702,9 +702,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Short-term (ticks): R_100, R_75, R_50, R_25, R_10\n"
             "1-second: 1HZ100V, 1HZ75V, 1HZ50V\n"
             "Long-term (hari): frxXAUUSD\n\n"
-            "<b>4️⃣ Strategi RSI</b>\n"
-            "• BUY (Call): RSI &lt; 30 (Oversold)\n"
-            "• SELL (Put): RSI &gt; 70 (Overbought)\n\n"
+            "<b>4️⃣ Strategi Tersedia (Baru!)</b>\n"
+            "• <code>/strategy list</code> - Lihat semua strategi\n"
+            "• <code>/strategy multi_indicator</code> - Multi-Indicator (default)\n"
+            "• <code>/strategy trend_following</code> - Trend Following\n"
+            "• <code>/strategy bollinger_bands</code> - Bollinger Bands Breakout\n"
+            "• <code>/strategy support_resistance</code> - Support/Resistance\n\n"
             "<b>5️⃣ Martingale</b>\n"
             "• WIN: Stake reset ke awal\n"
             "• LOSS: Stake x 2.1\n\n"
@@ -718,8 +721,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📚 PANDUAN PENGGUNAAN\n\n"
             "1. /akun - Cek saldo dan switch akun\n"
             "2. /autotrade - Mulai auto trading\n"
-            "3. /stop - Hentikan trading\n"
-            "4. /status - Cek status bot\n\n"
+            "3. /strategy - Pilih strategi trading\n"
+            "4. /stop - Hentikan trading\n"
+            "5. /status - Cek status bot\n\n"
             "Contoh: /autotrade 0.50 5t 5 R_100"
         )
 
@@ -786,6 +790,85 @@ async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success, message = auth_manager.logout(user_id)
     
     await update.message.reply_text(message, parse_mode="Markdown")
+
+
+async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /strategy - Pilih strategi trading"""
+    global trading_manager
+    if not update.message or not update.effective_user:
+        return
+    
+    user_id = update.effective_user.id
+    lang = get_user_language(user_id, update.effective_user.language_code)
+    
+    if not auth_manager.is_authenticated(user_id):
+        await update.message.reply_text(
+            "🔒 Anda belum login.\n\nGunakan /login untuk masuk terlebih dahulu.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    args = context.args if context.args else []
+    
+    if not args or args[0].lower() == "list":
+        await update.message.reply_text(
+            "📊 **STRATEGI TRADING TERSEDIA**\n\n"
+            "1. **multi_indicator** (Default)\n"
+            "   RSI, EMA, MACD, Stochastic, ADX\n\n"
+            "2. **trend_following** (Baru!)\n"
+            "   Mengikuti trend dengan EMA & ADX\n\n"
+            "3. **bollinger_bands** (Baru!)\n"
+            "   Trading breakout dari Bollinger Bands\n\n"
+            "4. **support_resistance** (Baru!)\n"
+            "   Bounce dan breakout di level penting\n\n"
+            "Gunakan: `/strategy <nama_strategi>`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    strategy_name = args[0].lower()
+    valid_strategies = ["multi_indicator", "trend_following", "bollinger_bands", "support_resistance"]
+    
+    if strategy_name not in valid_strategies:
+        await update.message.reply_text(
+            f"❌ Strategi '{strategy_name}' tidak dikenal.\n\n"
+            f"Gunakan: `/strategy list` untuk melihat semua strategi.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    if trading_manager and trading_manager.state != TradingState.IDLE:
+        await update.message.reply_text(
+            "⚠️ Hentikan trading terlebih dahulu dengan `/stop`\n\n"
+            "Strategi hanya bisa diubah saat trading tidak aktif.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    from trading import TradingManager
+    if deriv_ws:
+        trading_manager = TradingManager(deriv_ws, strategy_type=strategy_name)
+        
+        emoji_map = {
+            "multi_indicator": "📊",
+            "trend_following": "📈",
+            "bollinger_bands": "🎯",
+            "support_resistance": "🔄"
+        }
+        emoji = emoji_map.get(strategy_name, "✅")
+        
+        await update.message.reply_text(
+            f"{emoji} **Strategi diubah ke: {strategy_name.upper()}**\n\n"
+            f"Strategi baru sudah siap digunakan!\n"
+            f"Gunakan `/autotrade` untuk mulai trading.",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            "❌ WebSocket belum terkoneksi.\n\n"
+            "Gunakan `/start` terlebih dahulu.",
+            parse_mode="Markdown"
+        )
 
 
 async def whoami_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2166,6 +2249,7 @@ def main():
     app.add_handler(CommandHandler("autotrade", autotrade_command))
     app.add_handler(CommandHandler("stop", stop_command))
     app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("strategy", strategy_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, token_message_handler))

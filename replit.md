@@ -109,11 +109,23 @@ Do not make changes to the file `Y`.
     - **Welcome Message**: Dashboard menampilkan "Welcome, {first_name}!" untuk user yang login via Telegram
     - **Fallback Manual Token**: Jika tidak dari Telegram WebApp, user masih bisa login dengan token manual
     - **Sinkronisasi Bot & Dashboard**: Dashboard tersinkron dengan bot - user yang sama di Telegram dan dashboard
+- **Multi-Strategy System (v3.4)**:
+    - **Strategy Selection**: Command `/strategy <nama>` untuk memilih strategi trading
+    - **TrendFollowingStrategy**: Fokus pada trend strength (ADX) dan EMA alignment, confidence boost saat trend kuat, ideal untuk market trending
+    - **BollingerBandsStrategy**: Deteksi breakout dari Bollinger Bands dengan RSI/MACD confirmation, ideal untuk volatile market dengan clear breakout signals
+    - **SupportResistanceStrategy**: Local minima/maxima detection dengan bounce tolerance, ideal untuk range-bound market dengan clear S/R levels
+    - **Dynamic Stake Calculation**: Setiap strategi memiliki TP/SL distance yang optimal untuk karakteristik trading-nya
+    - **Backward Compatible**: Default tetap multi_indicator, user bisa switch strategi tanpa restart bot (harus stop trading dulu)
 
-### Feature Specifications
+### Feature Specifications (v3.4)
 - **Supported Symbols**: Volatility indices (R_100, R_75, R_50, R_25, R_10, 1HZ100V, 1HZ75V, 1HZ50V) for 5-10 ticks duration, and frxXAUUSD (Gold/USD) for daily duration.
-- **Telegram Integration**: Provides interactive commands like `/start`, `/akun`, `/autotrade`, `/stop`, `/status`, and `/help`.
+- **Telegram Integration**: Provides interactive commands like `/start`, `/akun`, `/autotrade`, `/stop`, `/status`, `/strategy`, and `/help`.
 - **Session Management**: Configurable target number of trades with auto-stop functionality.
+- **Multi-Strategy Support (Baru v3.4)**:
+  1. **Multi-Indicator Strategy** (Default) - RSI, EMA, MACD, Stochastic, ADX dengan multi-factor confluence scoring
+  2. **Trend Following Strategy** - Mengikuti trend jangka panjang menggunakan EMA Crossover & ADX Strength confirmation
+  3. **Bollinger Bands Breakout Strategy** - Trading saat harga breakout dari Bollinger Bands dengan RSI/MACD confirmation
+  4. **Support & Resistance Strategy** - Bounce & breakout di level support/resistance penting dengan local minima/maxima detection
 
 ### System Design Choices
 - **File Structure**: Modular Python files for entry point (`main.py`), strategy (`strategy.py`), WebSocket communication (`deriv_ws.py`), trading logic (`trading.py`), symbol configuration (`symbols.py`), pair scanner (`pair_scanner.py`), dan user authentication (`user_auth.py`).

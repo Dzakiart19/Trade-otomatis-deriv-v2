@@ -3467,3 +3467,295 @@ class TradingStrategy:
             f"• Volatility: {vol_zone} ({vol_mult:.0%}) {vol_emoji}\n"
             f"• Trend: {ind.trend_direction}"
         )
+
+
+class TrendFollowingStrategy(TradingStrategy):
+    """
+    Strategi Trend Following - Mengikuti trend jangka panjang
+    Menggunakan EMA untuk identifikasi trend dan ADX untuk kekuatan trend.
+    """
+    
+    def analyze(self) -> AnalysisResult:
+        """Analisis menggunakan strategi trend following"""
+        result = AnalysisResult(
+            signal=Signal.WAIT,
+            rsi_value=50.0,
+            trend_direction="SIDEWAYS",
+            confidence=0.0,
+            reason="Data tidak cukup"
+        )
+        
+        min_required = max(self.EMA_SLOW_PERIOD, self.ADX_PERIOD + 1)
+        if len(self.tick_history) < min_required:
+            return result
+        
+        indicators = self.calculate_all_indicators()
+        result.indicators = indicators
+        result.rsi_value = indicators.rsi
+        result.trend_direction = indicators.trend_direction
+        result.adx_value = indicators.adx
+        
+        vol_zone, vol_multiplier = self.get_volatility_zone()
+        result.volatility_zone = vol_zone
+        result.volatility_multiplier = vol_multiplier
+        
+        if indicators.atr > 0:
+            result.tp_distance = indicators.atr * 2.0
+            result.sl_distance = indicators.atr * 1.2
+        
+        current_price = self.tick_history[-1]
+        score = 0.0
+        reasons = []
+        
+        if indicators.ema_fast > indicators.ema_slow:
+            score += 0.4
+            reasons.append("📈 EMA9 > EMA21 (Trend UP)")
+            
+            if indicators.adx >= 20:
+                score += 0.3
+                reasons.append(f"💪 Trend kuat (ADX: {indicators.adx:.1f})")
+            else:
+                score += 0.15
+                reasons.append(f"⚠️ Trend lemah (ADX: {indicators.adx:.1f})")
+            
+            if current_price > indicators.ema_fast:
+                score += 0.2
+                reasons.append("✅ Harga > EMA9 (Konfirmasi)")
+            
+            if indicators.plus_di > indicators.minus_di and indicators.plus_di - indicators.minus_di > 5:
+                score += 0.15
+                reasons.append(f"🟢 +DI > -DI ({indicators.plus_di:.1f} > {indicators.minus_di:.1f})")
+            
+            if score >= 0.50:
+                result.signal = Signal.BUY
+                result.confidence = min(score, 1.0)
+                result.reason = " | ".join(reasons)
+        
+        elif indicators.ema_fast < indicators.ema_slow:
+            score += 0.4
+            reasons.append("📉 EMA9 < EMA21 (Trend DOWN)")
+            
+            if indicators.adx >= 20:
+                score += 0.3
+                reasons.append(f"💪 Trend kuat (ADX: {indicators.adx:.1f})")
+            else:
+                score += 0.15
+                reasons.append(f"⚠️ Trend lemah (ADX: {indicators.adx:.1f})")
+            
+            if current_price < indicators.ema_fast:
+                score += 0.2
+                reasons.append("✅ Harga < EMA9 (Konfirmasi)")
+            
+            if indicators.minus_di > indicators.plus_di and indicators.minus_di - indicators.plus_di > 5:
+                score += 0.15
+                reasons.append(f"🔴 -DI > +DI ({indicators.minus_di:.1f} > {indicators.plus_di:.1f})")
+            
+            if score >= 0.50:
+                result.signal = Signal.SELL
+                result.confidence = min(score, 1.0)
+                result.reason = " | ".join(reasons)
+        
+        return result
+
+
+class BollingerBandsStrategy(TradingStrategy):
+    """
+    Strategi Bollinger Bands Breakout
+    Trading saat harga breakout dari Bollinger Bands dengan volatility confirmation.
+    """
+    
+    BB_PERIOD = 20
+    BB_STD_DEV = 2.0
+    
+    def calculate_bollinger_bands(self) -> tuple:
+        """Hitung Bollinger Bands: (middle, upper, lower)"""
+        if len(self.tick_history) < self.BB_PERIOD:
+            return None, None, None
+        
+        prices = self.tick_history[-self.BB_PERIOD:]
+        middle = sum(prices) / len(prices)
+        
+        variance = sum((p - middle) ** 2 for p in prices) / len(prices)
+        std_dev = math.sqrt(variance)
+        
+        upper = middle + (std_dev * self.BB_STD_DEV)
+        lower = middle - (std_dev * self.BB_STD_DEV)
+        
+        return middle, upper, lower
+    
+    def analyze(self) -> AnalysisResult:
+        """Analisis menggunakan Bollinger Bands breakout"""
+        result = AnalysisResult(
+            signal=Signal.WAIT,
+            rsi_value=50.0,
+            trend_direction="SIDEWAYS",
+            confidence=0.0,
+            reason="Data tidak cukup"
+        )
+        
+        if len(self.tick_history) < self.BB_PERIOD:
+            return result
+        
+        indicators = self.calculate_all_indicators()
+        result.indicators = indicators
+        result.rsi_value = indicators.rsi
+        
+        middle, upper, lower = self.calculate_bollinger_bands()
+        if middle is None:
+            return result
+        
+        current_price = self.tick_history[-1]
+        prev_price = self.tick_history[-2]
+        
+        vol_zone, vol_multiplier = self.get_volatility_zone()
+        result.volatility_zone = vol_zone
+        result.volatility_multiplier = vol_multiplier
+        
+        if indicators.atr > 0:
+            result.tp_distance = indicators.atr * 2.5
+            result.sl_distance = indicators.atr * 1.0
+        
+        band_width = upper - lower
+        volatility_level = band_width / middle if middle > 0 else 0
+        
+        reasons = []
+        score = 0.0
+        
+        if prev_price <= lower < current_price:
+            score += 0.5
+            reasons.append(f"📉 Breakout Lower Band ({current_price:.5f})")
+            
+            if indicators.rsi < 30:
+                score += 0.3
+                reasons.append(f"🟢 RSI Oversold ({indicators.rsi:.1f})")
+            
+            if indicators.macd_histogram > 0:
+                score += 0.15
+                reasons.append("🟢 MACD Positive")
+            
+            if score >= 0.60:
+                result.signal = Signal.BUY
+                result.confidence = min(score, 1.0)
+                result.reason = " | ".join(reasons)
+        
+        elif prev_price >= upper > current_price:
+            score += 0.5
+            reasons.append(f"📈 Breakout Upper Band ({current_price:.5f})")
+            
+            if indicators.rsi > 70:
+                score += 0.3
+                reasons.append(f"🔴 RSI Overbought ({indicators.rsi:.1f})")
+            
+            if indicators.macd_histogram < 0:
+                score += 0.15
+                reasons.append("🔴 MACD Negative")
+            
+            if score >= 0.60:
+                result.signal = Signal.SELL
+                result.confidence = min(score, 1.0)
+                result.reason = " | ".join(reasons)
+        
+        return result
+
+
+class SupportResistanceStrategy(TradingStrategy):
+    """
+    Strategi Support & Resistance
+    Identifikasi level support/resistance dan trade saat harga bounce/breakout.
+    """
+    
+    SR_LOOKBACK = 50
+    
+    def find_support_resistance(self) -> tuple:
+        """Cari level support (local low) dan resistance (local high)"""
+        if len(self.tick_history) < self.SR_LOOKBACK:
+            return None, None
+        
+        recent = self.tick_history[-self.SR_LOOKBACK:]
+        window = 5
+        
+        support_levels = []
+        resistance_levels = []
+        
+        for i in range(window, len(recent) - window):
+            window_prices = recent[i-window:i+window]
+            
+            if recent[i] == min(window_prices):
+                support_levels.append(recent[i])
+            if recent[i] == max(window_prices):
+                resistance_levels.append(recent[i])
+        
+        avg_support = min(recent) if support_levels else None
+        avg_resistance = max(recent) if resistance_levels else None
+        
+        return avg_support, avg_resistance
+    
+    def analyze(self) -> AnalysisResult:
+        """Analisis menggunakan Support & Resistance"""
+        result = AnalysisResult(
+            signal=Signal.WAIT,
+            rsi_value=50.0,
+            trend_direction="SIDEWAYS",
+            confidence=0.0,
+            reason="Data tidak cukup"
+        )
+        
+        if len(self.tick_history) < self.SR_LOOKBACK:
+            return result
+        
+        indicators = self.calculate_all_indicators()
+        result.indicators = indicators
+        result.rsi_value = indicators.rsi
+        
+        support, resistance = self.find_support_resistance()
+        if support is None or resistance is None:
+            return result
+        
+        current_price = self.tick_history[-1]
+        vol_zone, vol_multiplier = self.get_volatility_zone()
+        result.volatility_zone = vol_zone
+        result.volatility_multiplier = vol_multiplier
+        
+        if indicators.atr > 0:
+            result.tp_distance = (resistance - support) * 0.5
+            result.sl_distance = (resistance - support) * 0.25
+        
+        bounce_tolerance = (resistance - support) * 0.05
+        mid_price = (support + resistance) / 2
+        
+        reasons = []
+        score = 0.0
+        
+        if abs(current_price - support) < bounce_tolerance:
+            score += 0.4
+            reasons.append(f"🟢 Bounce Support ({support:.5f})")
+            
+            if indicators.rsi < 40:
+                score += 0.25
+                reasons.append("🟢 RSI Low (Oversold)")
+            
+            if indicators.ema_fast > indicators.ema_slow:
+                score += 0.2
+                reasons.append("📈 EMA Bullish")
+            
+            if score >= 0.55:
+                result.signal = Signal.BUY
+                result.confidence = min(score, 1.0)
+                result.reason = " | ".join(reasons)
+        
+        elif abs(current_price - resistance) < bounce_tolerance:
+            score += 0.4
+            reasons.append(f"🔴 Resistance ({resistance:.5f})")
+            
+            if indicators.rsi > 60:
+                score += 0.25
+                reasons.append("🔴 RSI High (Overbought)")
+            
+            if indicators.ema_fast < indicators.ema_slow:
+                score += 0.2
+                reasons.append("📉 EMA Bearish")
+            
+            if score >= 0.55:
+                result.signal = Signal.SELL
+                result.confidence = min(score, 1.0)
+                result.reason = " | ".join(reasons)

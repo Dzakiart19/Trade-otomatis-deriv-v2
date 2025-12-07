@@ -43,7 +43,7 @@ from enum import Enum
 from datetime import datetime, timedelta
 from collections import deque
 
-from strategy import TradingStrategy, Signal, AnalysisResult
+from strategy import TradingStrategy, Signal, AnalysisResult, TrendFollowingStrategy, BollingerBandsStrategy, SupportResistanceStrategy
 from deriv_ws import DerivWebSocket, AccountType
 from symbols import (
     SUPPORTED_SYMBOLS, 
@@ -280,15 +280,25 @@ class TradingManager:
     SESSION_RECOVERY_MAX_AGE = 1800  # restore jika bot restart dalam 30 menit (1800 detik)
     SESSION_RECOVERY_FILE = "logs/session_recovery.json"
     
-    def __init__(self, deriv_ws: DerivWebSocket):
+    def __init__(self, deriv_ws: DerivWebSocket, strategy_type: str = "multi_indicator"):
         """
         Inisialisasi Trading Manager.
         
         Args:
             deriv_ws: Instance DerivWebSocket yang sudah terkoneksi
+            strategy_type: Tipe strategi ("multi_indicator", "trend_following", "bollinger_bands", "support_resistance")
         """
         self.ws = deriv_ws
-        self.strategy = TradingStrategy()
+        self.strategy_type = strategy_type
+        
+        if strategy_type == "trend_following":
+            self.strategy = TrendFollowingStrategy()
+        elif strategy_type == "bollinger_bands":
+            self.strategy = BollingerBandsStrategy()
+        elif strategy_type == "support_resistance":
+            self.strategy = SupportResistanceStrategy()
+        else:
+            self.strategy = TradingStrategy()  # Default multi_indicator
         
         # Trading parameters
         self.base_stake = MIN_STAKE_GLOBAL
