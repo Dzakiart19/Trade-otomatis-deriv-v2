@@ -172,6 +172,19 @@ class IndicatorValues:
 
 
 @dataclass
+class TickPickerData:
+    """Data hasil analisis Tick Picker untuk prediksi arah tick"""
+    tick_up_count: int
+    tick_down_count: int
+    total_analyzed: int
+    up_percentage: float
+    down_percentage: float
+    signal_direction: str
+    signal_confidence: float
+    window_size: int
+
+
+@dataclass
 class AnalysisResult:
     """Hasil analisis strategi"""
     signal: Signal
@@ -185,6 +198,7 @@ class AnalysisResult:
     adx_value: float = 0.0
     volatility_zone: str = "NORMAL"
     volatility_multiplier: float = 1.0
+    tick_picker: Optional[TickPickerData] = None
 
 
 class TradingStrategy:
@@ -260,6 +274,9 @@ class TradingStrategy:
     MIN_PREDICTION_CONFIDENCE = 0.55  # Lowered: was 0.60, now 0.55 for more signal opportunities
     PREDICTION_MOMENTUM_LOOKBACK = 20  # Increased: was 15, now 20 ticks for better momentum detection
     PREDICTION_SEQUENCE_LOOKBACK = 15  # Increased: was 10, now 15 ticks for better pattern detection
+    
+    TICK_PICKER_THRESHOLD = 0.60  # 60% threshold for tick picker signal generation
+    TICK_PICKER_DEFAULT_WINDOW = 50  # Default window size for tick picker analysis
     
     # Enhanced Prediction v3.0 - Multi-Factor Deep Analysis
     PREDICTION_ROC_LOOKBACK = 8  # Rate of Change calculation period
@@ -3099,6 +3116,8 @@ class TradingStrategy:
         result.volatility_zone = vol_zone
         result.volatility_multiplier = vol_multiplier
         
+        result.tick_picker = self.analyze_tick_direction(self.TICK_PICKER_DEFAULT_WINDOW)
+        
         if self.BLOCK_EXTREME_VOLATILITY and vol_zone == "EXTREME_HIGH":
             result.signal = Signal.WAIT
             result.confidence = 0.0
@@ -3391,6 +3410,70 @@ class TradingStrategy:
             sl_price = entry_price + sl_distance
             
         return round(tp_price, 5), round(sl_price, 5)
+    
+    def analyze_tick_direction(self, window_size: int = 50) -> TickPickerData:
+        """
+        Tick Picker Analysis - Analisis arah tick berdasarkan binarybot.live/tick-picker/
+        
+        Menghitung jumlah tick naik vs turun dalam window tertentu dan menghasilkan
+        sinyal trading berdasarkan threshold 60%.
+        
+        Args:
+            window_size: Jumlah tick untuk dianalisis (default 50, bisa 50/100/250)
+            
+        Returns:
+            TickPickerData dengan informasi:
+            - tick_up_count: Jumlah tick naik
+            - tick_down_count: Jumlah tick turun
+            - total_analyzed: Total tick yang dianalisis
+            - up_percentage: Persentase tick naik
+            - down_percentage: Persentase tick turun
+            - signal_direction: "CALL", "PUT", atau "WAIT"
+            - signal_confidence: Confidence level (0.0 - 1.0)
+            - window_size: Window size yang digunakan
+        """
+        if len(self.tick_history) < 2:
+            return TickPickerData(0, 0, 0, 50.0, 50.0, "WAIT", 0.0, window_size)
+        
+        available = min(window_size, len(self.tick_history) - 1)
+        ticks = self.tick_history[-(available + 1):]
+        
+        up_count = 0
+        down_count = 0
+        for i in range(1, len(ticks)):
+            if ticks[i] > ticks[i-1]:
+                up_count += 1
+            elif ticks[i] < ticks[i-1]:
+                down_count += 1
+        
+        total = up_count + down_count
+        if total == 0:
+            return TickPickerData(0, 0, 0, 50.0, 50.0, "WAIT", 0.0, window_size)
+        
+        up_pct = (up_count / total) * 100
+        down_pct = (down_count / total) * 100
+        
+        signal = "WAIT"
+        confidence = 0.0
+        threshold_pct = self.TICK_PICKER_THRESHOLD * 100
+        
+        if up_pct >= threshold_pct:
+            signal = "CALL"
+            confidence = min((up_pct - 50) / 30, 1.0)
+        elif down_pct >= threshold_pct:
+            signal = "PUT"
+            confidence = min((down_pct - 50) / 30, 1.0)
+        
+        return TickPickerData(
+            tick_up_count=up_count,
+            tick_down_count=down_count,
+            total_analyzed=total,
+            up_percentage=round(up_pct, 2),
+            down_percentage=round(down_pct, 2),
+            signal_direction=signal,
+            signal_confidence=round(confidence, 3),
+            window_size=window_size
+        )
         
     def get_stats(self) -> dict:
         """
