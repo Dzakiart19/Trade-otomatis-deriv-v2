@@ -83,6 +83,10 @@ class StrategyMode(Enum):
     MULTI_INDICATOR = "multi_indicator"  # RSI-based (default)
     LDP = "ldp"  # Last Digit Prediction
     TICK_ANALYZER = "tick_analyzer"  # Tick pattern based
+    TERMINAL = "terminal"  # Smart Analysis + Hybrid Recovery
+    DIGITPAD = "digitpad"  # Digit 0-9 prediction + Even/Odd
+    AMT = "amt"  # Accumulator trading
+    SNIPER = "sniper"  # High probability sniper
 
 
 @dataclass
@@ -455,14 +459,27 @@ class TradingManager:
         if mode == StrategyMode.LDP:
             self.ldp_strategy = LDPStrategy()
             logger.info("🎯 Strategy mode set to LDP (Last Digit Prediction)")
-            return "Strategi diubah ke LDP (Last Digit Prediction)"
+            return "Strategi diubah ke LDP (Last Digit Prediction)\n\n📝 Over/Under, Match/Differ, Rise/Fall berdasarkan digit terakhir"
         elif mode == StrategyMode.TICK_ANALYZER:
             self.tick_analyzer = TickTrendAnalyzer()
             logger.info("📈 Strategy mode set to Tick Analyzer")
-            return "Strategi diubah ke Tick Analyzer"
+            return "Strategi diubah ke Tick Analyzer\n\n📝 Analisis trend tick untuk BUY/SELL"
+        elif mode == StrategyMode.TERMINAL:
+            logger.info("🖥️ Strategy mode set to Terminal (Smart Analysis)")
+            return "Strategi diubah ke Terminal\n\n📝 Smart Analysis 80% + Hybrid Recovery dengan 4 level risiko"
+        elif mode == StrategyMode.DIGITPAD:
+            self.ldp_strategy = LDPStrategy()
+            logger.info("🔢 Strategy mode set to DigitPad")
+            return "Strategi diubah ke DigitPad\n\n📝 Prediksi digit 0-9, Even/Odd dengan signals chart"
+        elif mode == StrategyMode.AMT:
+            logger.info("📈 Strategy mode set to AMT (Accumulator)")
+            return "Strategi diubah ke AMT (Accumulator)\n\n📝 Trading accumulator dengan Take Profit/Stop Loss"
+        elif mode == StrategyMode.SNIPER:
+            logger.info("🎯 Strategy mode set to Sniper")
+            return "Strategi diubah ke Sniper\n\n📝 High probability entry dengan strategy selector"
         else:
             logger.info("📊 Strategy mode set to Multi-Indicator (default)")
-            return "Strategi diubah ke Multi-Indicator (default)"
+            return "Strategi diubah ke Multi-Indicator (default)\n\n📝 RSI + EMA + MACD + Trend Analysis"
     
     def enable_hybrid_money_manager(self, balance: float, stake: float = 0.35) -> str:
         """Enable hybrid money manager for small capital"""

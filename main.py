@@ -970,9 +970,13 @@ async def strategi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     keyboard = [
-        [InlineKeyboardButton("📊 Multi-Indicator (RSI)", callback_data="strategy_multi")],
-        [InlineKeyboardButton("🎯 LDP (Last Digit)", callback_data="strategy_ldp")],
-        [InlineKeyboardButton("📈 Tick Analyzer", callback_data="strategy_tick")],
+        [InlineKeyboardButton("📊 Multi-Indicator", callback_data="strategy_multi")],
+        [InlineKeyboardButton("🎯 LDP Analyzer", callback_data="strategy_ldp")],
+        [InlineKeyboardButton("📈 Tick Picker", callback_data="strategy_tick")],
+        [InlineKeyboardButton("🖥️ Terminal", callback_data="strategy_terminal")],
+        [InlineKeyboardButton("🔢 DigitPad", callback_data="strategy_digitpad")],
+        [InlineKeyboardButton("📈 AMT (Accumulator)", callback_data="strategy_amt")],
+        [InlineKeyboardButton("🎯 Sniper", callback_data="strategy_sniper")],
         [InlineKeyboardButton("💰 Hybrid Money Manager", callback_data="strategy_hybrid")],
         [InlineKeyboardButton("⬅️ Kembali", callback_data="menu_main")]
     ]
@@ -985,10 +989,14 @@ async def strategi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"⚙️ **PILIH STRATEGI TRADING**\n\n"
         f"Strategi aktif: *{current_strategy}*\n\n"
-        f"📊 *Multi-Indicator*: RSI + Trend (default)\n"
-        f"🎯 *LDP*: Prediksi digit terakhir\n"
-        f"📈 *Tick Analyzer*: Pattern tick\n"
-        f"💰 *Hybrid MM*: Money management aman\n\n"
+        f"📊 *Multi-Indicator*: RSI + EMA + MACD\n"
+        f"🎯 *LDP Analyzer*: Over/Under, Match/Differ\n"
+        f"📈 *Tick Picker*: Analisis trend tick\n"
+        f"🖥️ *Terminal*: Smart Analysis 80%\n"
+        f"🔢 *DigitPad*: Digit 0-9, Even/Odd\n"
+        f"📈 *AMT*: Accumulator + TP/SL\n"
+        f"🎯 *Sniper*: High probability entry\n"
+        f"💰 *Hybrid MM*: Money management\n\n"
         f"Pilih strategi:",
         parse_mode="Markdown",
         reply_markup=reply_markup
@@ -1818,9 +1826,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == "menu_strategi":
         keyboard = [
-            [InlineKeyboardButton("📊 Multi-Indicator (RSI)", callback_data="strategy_multi")],
-            [InlineKeyboardButton("🎯 LDP (Last Digit)", callback_data="strategy_ldp")],
-            [InlineKeyboardButton("📈 Tick Analyzer", callback_data="strategy_tick")],
+            [InlineKeyboardButton("📊 Multi-Indicator", callback_data="strategy_multi")],
+            [InlineKeyboardButton("🎯 LDP Analyzer", callback_data="strategy_ldp")],
+            [InlineKeyboardButton("📈 Tick Picker", callback_data="strategy_tick")],
+            [InlineKeyboardButton("🖥️ Terminal", callback_data="strategy_terminal")],
+            [InlineKeyboardButton("🔢 DigitPad", callback_data="strategy_digitpad")],
+            [InlineKeyboardButton("📈 AMT (Accumulator)", callback_data="strategy_amt")],
+            [InlineKeyboardButton("🎯 Sniper", callback_data="strategy_sniper")],
             [InlineKeyboardButton("💰 Hybrid Money Manager", callback_data="strategy_hybrid")],
             [InlineKeyboardButton("⬅️ Kembali", callback_data="menu_main")]
         ]
@@ -1833,10 +1845,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"⚙️ **PILIH STRATEGI TRADING**\n\n"
             f"Strategi aktif: *{current_strategy}*\n\n"
-            f"📊 *Multi-Indicator*: RSI + Trend (default)\n"
-            f"🎯 *LDP*: Prediksi digit terakhir\n"
-            f"📈 *Tick Analyzer*: Pattern tick\n"
-            f"💰 *Hybrid MM*: Money management aman\n\n"
+            f"📊 *Multi-Indicator*: RSI + EMA + MACD\n"
+            f"🎯 *LDP Analyzer*: Over/Under, Match/Differ\n"
+            f"📈 *Tick Picker*: Analisis trend tick\n"
+            f"🖥️ *Terminal*: Smart Analysis 80%\n"
+            f"🔢 *DigitPad*: Digit 0-9, Even/Odd\n"
+            f"📈 *AMT*: Accumulator + TP/SL\n"
+            f"🎯 *Sniper*: High probability entry\n"
+            f"💰 *Hybrid MM*: Money management\n\n"
             f"Pilih strategi:",
             parse_mode="Markdown",
             reply_markup=reply_markup
@@ -1868,6 +1884,30 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
         else:
             await query.edit_message_text("❌ Tidak dapat mengaktifkan Hybrid MM. Cek koneksi.", parse_mode="Markdown")
+        return
+
+    elif data == "strategy_terminal":
+        if trading_manager:
+            result = trading_manager.set_strategy_mode(StrategyMode.TERMINAL)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+        return
+
+    elif data == "strategy_digitpad":
+        if trading_manager:
+            result = trading_manager.set_strategy_mode(StrategyMode.DIGITPAD)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+        return
+
+    elif data == "strategy_amt":
+        if trading_manager:
+            result = trading_manager.set_strategy_mode(StrategyMode.AMT)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+        return
+
+    elif data == "strategy_sniper":
+        if trading_manager:
+            result = trading_manager.set_strategy_mode(StrategyMode.SNIPER)
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
         return
         
     elif data == "akun_refresh":
