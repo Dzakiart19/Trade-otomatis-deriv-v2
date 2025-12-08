@@ -234,12 +234,14 @@ class DerivWebSocket:
         # Stop health check
         self._stop_health_check_event.set()
         
-        # Reset auth event
-        self._auth_event.clear()
-        self._auth_success = False
+        # Set auth failure if waiter is pending (don't clear - signal failure instead)
+        if not self._auth_event.is_set():
+            self._last_auth_error = f"Connection closed: {close_msg or 'Unknown'}"
+            self._auth_success = False
+            self._auth_event.set()  # Signal failure to waiting thread
         
-        # Coba reconnect
-        self._attempt_reconnect()
+        # Don't auto-reconnect for user-initiated connections - let user retry with /start
+        # self._attempt_reconnect()
         
     def _on_error(self, ws, error):
         """Callback saat terjadi error"""
@@ -306,14 +308,8 @@ class DerivWebSocket:
             self._auth_success = False
             self._auth_event.set()  # Signal that auth completed (with failure)
             
-            # Check if we should retry
-            if self.auth_retry_count < self.MAX_AUTH_RETRIES:
-                self._handle_auth_retry(error_code, error_msg)
-            else:
-                logger.error(f"❌ Max auth retries ({self.MAX_AUTH_RETRIES}) reached")
-                # Try fallback to demo if we were trying real
-                if self.current_account_type == AccountType.REAL and self.demo_token:
-                    self._try_fallback_to_demo()
+            # Log error details - no automatic retry for user-initiated connections
+            self._handle_auth_retry(error_code, error_msg)
             return
             
         auth_info = data.get("authorize", {})
@@ -342,38 +338,27 @@ class DerivWebSocket:
         self._subscribe_balance()
         
     def _handle_auth_retry(self, error_code: str, error_msg: str):
-        """Handle retry logic untuk authorization yang gagal"""
+        """
+        Handle authorization failure - no automatic retry for user-initiated connections.
+        User can retry manually with /start command.
         
-        # InvalidToken - langsung fallback ke demo tanpa retry
+        Note: _auth_event is already set in _handle_authorize before this is called,
+        so wait_until_ready() will return immediately with the error.
+        """
+        # Log error details based on error code
         if error_code == "InvalidToken":
-            logger.error(f"🚫 Token invalid terdeteksi: {error_msg}")
-            logger.error("   Token tidak valid atau sudah expired - tidak perlu retry")
-            
-            # Jika sedang mencoba real account, langsung fallback ke demo
-            if self.current_account_type == AccountType.REAL and self.demo_token:
-                logger.info("🔄 InvalidToken pada REAL account - langsung fallback ke DEMO")
-                self._try_fallback_to_demo()
-            else:
-                logger.error("❌ InvalidToken pada DEMO account - tidak bisa fallback")
-                logger.error("   Periksa kembali API token di environment variables")
-            return
+            logger.error(f"🚫 Token invalid: {error_msg}")
+            logger.error("   Token tidak valid atau sudah expired")
+        elif error_code == "RateLimit":
+            logger.warning(f"⚠️ Rate limited: {error_msg}")
+        elif error_code == "AuthorizationRequired":
+            logger.error(f"🔐 Authorization required: {error_msg}")
+        else:
+            logger.error(f"❌ Auth error [{error_code}]: {error_msg}")
         
-        self.auth_retry_count += 1
-        
-        # Calculate backoff delay
-        delay = self.AUTH_RETRY_DELAY * (2 ** (self.auth_retry_count - 1))
-        delay = min(delay, 30)  # Max 30 seconds
-        
-        logger.info(f"🔄 Retrying authorization in {delay}s (attempt {self.auth_retry_count}/{self.MAX_AUTH_RETRIES})")
-        
-        # Schedule retry in a separate thread
-        def retry_auth():
-            time.sleep(delay)
-            if self.is_connected and not self.is_authorized:
-                self._authorize()
-                
-        retry_thread = threading.Thread(target=retry_auth, daemon=True)
-        retry_thread.start()
+        # Don't retry - let user retry manually with /start
+        # _auth_event is already set, wait_until_ready will return with failure
+        logger.info("ℹ️ User dapat mencoba koneksi ulang dengan /start")
         
     def _try_fallback_to_demo(self):
         """Fallback ke demo account jika real gagal"""
@@ -925,7 +910,13 @@ class DerivWebSocket:
                 
         self.is_connected = False
         self.is_authorized = False
-        self._auth_event.clear()
+        
+        # Set auth failure if waiter is pending (don't clear - signal failure instead)
+        if not self._auth_event.is_set():
+            self._last_auth_error = "Disconnected by user"
+            self._auth_success = False
+            self._auth_event.set()
+        
         self._update_connection_state("disconnected")
         logger.info("WebSocket disconnected")
             

@@ -311,6 +311,7 @@ def cleanup_old_logs(max_days: int = 1, keep_today_trades: bool = True) -> int:
 def connect_user_deriv(user_id: int) -> tuple[bool, str]:
     """
     Koneksi atau reconnect WebSocket dengan token user yang sudah login.
+    Single attempt with proper cleanup - no retry to avoid stale state issues.
     
     Args:
         user_id: Telegram user ID
@@ -334,12 +335,14 @@ def connect_user_deriv(user_id: int) -> tuple[bool, str]:
         
         logger.info(f"🔌 Connecting Deriv for user {user_id} ({account_type})")
         
-        if deriv_ws and deriv_ws.is_connected:
+        if deriv_ws:
             try:
                 deriv_ws.disconnect()
                 logger.info("📴 Previous WebSocket disconnected")
+                time.sleep(0.5)
             except Exception as e:
                 logger.warning(f"Error disconnecting previous WS: {e}")
+            deriv_ws = None
         
         try:
             if account_type.lower() == "demo":
@@ -355,38 +358,63 @@ def connect_user_deriv(user_id: int) -> tuple[bool, str]:
                 )
                 deriv_ws.current_account_type = AccountType.REAL
             
-            if deriv_ws.connect():
-                if deriv_ws.wait_until_ready(timeout=45):
-                    logger.info("✅ Deriv WebSocket connected and authorized!")
-                    
-                    trading_manager = TradingManager(deriv_ws)
-                    
-                    telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-                    if telegram_token:
-                        setup_trading_callbacks(telegram_token)
-                        logger.info("✅ Trading callbacks configured for Telegram notifications")
-                    
-                    pair_scanner = PairScanner(deriv_ws)
-                    pair_scanner.start_scanning()
-                    
-                    current_connected_user_id = user_id
-                    
-                    if deriv_ws.account_info:
-                        logger.info(f"   Account: {deriv_ws.account_info.account_id}")
-                        logger.info(f"   Balance: {deriv_ws.account_info.balance} {deriv_ws.account_info.currency}")
-                        
-                    return True, "Koneksi berhasil!"
-                else:
-                    error_msg = deriv_ws.get_last_auth_error() if hasattr(deriv_ws, 'get_last_auth_error') else "Unknown"
-                    logger.error(f"❌ Authorization timeout. Error: {error_msg}")
-                    return False, f"Gagal otorisasi: {error_msg}"
-            else:
-                logger.error("❌ Failed to connect to Deriv WebSocket")
-                return False, "Gagal koneksi ke Deriv"
+            if not deriv_ws.connect():
+                logger.error("❌ Failed to start WebSocket connection")
+                deriv_ws = None
+                return False, "Gagal membuka koneksi ke server Deriv. Silakan coba lagi dengan /start."
+            
+            if deriv_ws.wait_until_ready(timeout=45):
+                logger.info("✅ Deriv WebSocket connected and authorized!")
                 
+                trading_manager = TradingManager(deriv_ws)
+                
+                telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+                if telegram_token:
+                    setup_trading_callbacks(telegram_token)
+                    logger.info("✅ Trading callbacks configured for Telegram notifications")
+                
+                pair_scanner = PairScanner(deriv_ws)
+                pair_scanner.start_scanning()
+                
+                current_connected_user_id = user_id
+                
+                if deriv_ws.account_info:
+                    logger.info(f"   Account: {deriv_ws.account_info.account_id}")
+                    logger.info(f"   Balance: {deriv_ws.account_info.balance} {deriv_ws.account_info.currency}")
+                    
+                return True, "Koneksi berhasil!"
+            else:
+                error_msg = deriv_ws.get_last_auth_error() if hasattr(deriv_ws, 'get_last_auth_error') else ""
+                logger.error(f"❌ Authorization failed. Error: {error_msg}")
+                
+                try:
+                    deriv_ws.disconnect()
+                except:
+                    pass
+                deriv_ws = None
+                
+                if "InvalidToken" in error_msg:
+                    auth_manager.clear_invalid_session(user_id)
+                    return False, "Token tidak valid atau sudah expired di Deriv. Silakan login ulang dengan /login."
+                elif "RateLimit" in error_msg:
+                    return False, "Terlalu banyak permintaan. Tunggu beberapa menit lalu coba lagi dengan /start."
+                elif error_msg:
+                    if "invalid" in error_msg.lower() or "expire" in error_msg.lower():
+                        auth_manager.clear_invalid_session(user_id)
+                        return False, "Token tidak valid. Silakan login ulang dengan /login."
+                    return False, f"Gagal otorisasi: {error_msg}. Silakan coba lagi dengan /start."
+                else:
+                    return False, "Koneksi timeout. Server Deriv mungkin sibuk. Silakan coba lagi dengan /start."
+                    
         except Exception as e:
             logger.error(f"❌ Exception during connection: {type(e).__name__}: {e}")
-            return False, f"Error: {str(e)}"
+            if deriv_ws:
+                try:
+                    deriv_ws.disconnect()
+                except:
+                    pass
+                deriv_ws = None
+            return False, f"Error koneksi: {str(e)}. Silakan coba lagi dengan /start."
 
 
 async def connect_user_deriv_async(user_id: int) -> tuple[bool, str]:
