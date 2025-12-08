@@ -19,6 +19,7 @@ class TradingDashboard {
         this.lastTickPrice = null;
         this.currentSignal = 'neutral';
         this.tickPickerData = null;
+        this.currentStrategy = 'MULTI_INDICATOR';
         
         this.symbols = [
             'R_100', 'R_75', 'R_50', 'R_25', 'R_10',
@@ -642,7 +643,229 @@ class TradingDashboard {
                 if (data.tick_picker) {
                     this.updateTickPicker(data.tick_picker);
                 }
+                if (data.strategy_mode) {
+                    this.updateStrategyPanel(data.strategy_mode);
+                }
+                if (data.ldp_data) {
+                    this.updateLDPPanel(data.ldp_data);
+                }
+                if (data.tick_analyzer_data) {
+                    this.updateTickAnalyzerPanel(data.tick_analyzer_data);
+                }
+                if (data.multi_indicator_data) {
+                    this.updateMultiIndicatorPanel(data.multi_indicator_data);
+                }
                 break;
+        }
+    }
+    
+    updateStrategyPanel(strategyMode) {
+        if (this.currentStrategy === strategyMode) return;
+        this.currentStrategy = strategyMode;
+        
+        const strategyNameEl = document.getElementById('current-strategy');
+        if (strategyNameEl) {
+            strategyNameEl.textContent = strategyMode;
+        }
+        
+        const ldpPanel = document.getElementById('ldp-panel');
+        const tickAnalyzerPanel = document.getElementById('tick-analyzer-panel');
+        const multiIndicatorPanel = document.getElementById('multi-indicator-panel');
+        
+        if (ldpPanel) ldpPanel.style.display = 'none';
+        if (tickAnalyzerPanel) tickAnalyzerPanel.style.display = 'none';
+        if (multiIndicatorPanel) multiIndicatorPanel.style.display = 'none';
+        
+        switch (strategyMode) {
+            case 'LDP':
+                if (ldpPanel) ldpPanel.style.display = 'block';
+                break;
+            case 'TICK_ANALYZER':
+                if (tickAnalyzerPanel) tickAnalyzerPanel.style.display = 'block';
+                break;
+            case 'MULTI_INDICATOR':
+            default:
+                if (multiIndicatorPanel) multiIndicatorPanel.style.display = 'block';
+                break;
+        }
+    }
+    
+    updateLDPPanel(data) {
+        if (!data) return;
+        
+        if (data.digit_frequencies) {
+            const heatmap = document.getElementById('digit-heatmap');
+            if (heatmap) {
+                const cells = heatmap.querySelectorAll('.digit-cell');
+                const frequencies = data.digit_frequencies;
+                const maxFreq = Math.max(...Object.values(frequencies));
+                const minFreq = Math.min(...Object.values(frequencies));
+                
+                cells.forEach(cell => {
+                    const digit = cell.dataset.digit;
+                    const freq = frequencies[digit] || 0;
+                    const freqEl = cell.querySelector('.digit-freq');
+                    if (freqEl) freqEl.textContent = `${freq.toFixed(1)}%`;
+                    
+                    cell.classList.remove('hot', 'cold');
+                    if (freq >= maxFreq - 1) {
+                        cell.classList.add('hot');
+                    } else if (freq <= minFreq + 1) {
+                        cell.classList.add('cold');
+                    }
+                });
+            }
+        }
+        
+        if (data.hot_digits) {
+            const hotDigitsEl = document.getElementById('hot-digits');
+            if (hotDigitsEl) {
+                hotDigitsEl.textContent = data.hot_digits.join(', ');
+            }
+        }
+        
+        if (data.cold_digits) {
+            const coldDigitsEl = document.getElementById('cold-digits');
+            if (coldDigitsEl) {
+                coldDigitsEl.textContent = data.cold_digits.join(', ');
+            }
+        }
+        
+        if (data.zones) {
+            const lowZoneFill = document.getElementById('low-zone-fill');
+            const highZoneFill = document.getElementById('high-zone-fill');
+            const lowZonePct = document.getElementById('low-zone-pct');
+            const highZonePct = document.getElementById('high-zone-pct');
+            
+            const lowPct = data.zones.low || 50;
+            const highPct = data.zones.high || 50;
+            
+            if (lowZoneFill) lowZoneFill.style.width = `${lowPct}%`;
+            if (highZoneFill) highZoneFill.style.width = `${highPct}%`;
+            if (lowZonePct) lowZonePct.textContent = `${lowPct.toFixed(1)}%`;
+            if (highZonePct) highZonePct.textContent = `${highPct.toFixed(1)}%`;
+        }
+        
+        if (data.signal_type && data.signal_digit !== undefined) {
+            const ldpSignal = document.getElementById('ldp-signal');
+            if (ldpSignal) {
+                const typeEl = ldpSignal.querySelector('.ldp-signal-type');
+                const digitEl = ldpSignal.querySelector('.ldp-signal-digit');
+                if (typeEl) typeEl.textContent = data.signal_type;
+                if (digitEl) digitEl.textContent = data.signal_digit;
+            }
+        }
+    }
+    
+    updateTickAnalyzerPanel(data) {
+        if (!data) return;
+        
+        const streakCounter = document.getElementById('streak-counter');
+        const streakDirection = document.getElementById('streak-direction');
+        const streakCount = document.getElementById('streak-count');
+        
+        if (data.streak !== undefined) {
+            const direction = data.streak >= 0 ? 'UP' : 'DOWN';
+            const count = Math.abs(data.streak);
+            
+            if (streakCounter) {
+                streakCounter.classList.remove('up', 'down');
+                streakCounter.classList.add(direction.toLowerCase());
+            }
+            if (streakDirection) streakDirection.textContent = direction;
+            if (streakCount) streakCount.textContent = count;
+        }
+        
+        if (data.momentum !== undefined) {
+            const momentumIndicator = document.getElementById('momentum-indicator');
+            const momentumValue = document.getElementById('momentum-value');
+            
+            const normalizedMomentum = Math.max(-1, Math.min(1, data.momentum));
+            const leftPercent = ((normalizedMomentum + 1) / 2) * 100;
+            
+            if (momentumIndicator) momentumIndicator.style.left = `${leftPercent}%`;
+            if (momentumValue) momentumValue.textContent = data.momentum.toFixed(2);
+        }
+        
+        if (data.patterns) {
+            const patternBadges = document.getElementById('pattern-badges');
+            if (patternBadges) {
+                if (data.patterns.length === 0) {
+                    patternBadges.innerHTML = '<span class="pattern-badge none">No pattern</span>';
+                } else {
+                    patternBadges.innerHTML = data.patterns.map(p => {
+                        const badgeClass = p.type === 'bullish' ? 'bullish' : p.type === 'bearish' ? 'bearish' : '';
+                        return `<span class="pattern-badge ${badgeClass}">${p.name}</span>`;
+                    }).join('');
+                }
+            }
+        }
+    }
+    
+    updateMultiIndicatorPanel(data) {
+        if (!data) return;
+        
+        if (data.rsi !== undefined) {
+            const rsiMarker = document.getElementById('rsi-marker');
+            const rsiValue = document.getElementById('rsi-value');
+            
+            if (rsiMarker) rsiMarker.style.left = `${data.rsi}%`;
+            if (rsiValue) rsiValue.textContent = data.rsi.toFixed(2);
+        }
+        
+        if (data.trend) {
+            const trendIndicator = document.getElementById('trend-indicator');
+            if (trendIndicator) {
+                const arrow = trendIndicator.querySelector('.trend-arrow');
+                const text = trendIndicator.querySelector('.trend-text');
+                
+                trendIndicator.classList.remove('up', 'down', 'neutral');
+                
+                if (data.trend === 'UP' || data.trend === 'BULLISH') {
+                    trendIndicator.classList.add('up');
+                    if (arrow) arrow.textContent = '↑';
+                    if (text) text.textContent = 'BULLISH';
+                } else if (data.trend === 'DOWN' || data.trend === 'BEARISH') {
+                    trendIndicator.classList.add('down');
+                    if (arrow) arrow.textContent = '↓';
+                    if (text) text.textContent = 'BEARISH';
+                } else {
+                    trendIndicator.classList.add('neutral');
+                    if (arrow) arrow.textContent = '→';
+                    if (text) text.textContent = 'NEUTRAL';
+                }
+            }
+        }
+        
+        if (data.macd) {
+            const macdSignal = document.getElementById('macd-signal');
+            if (macdSignal) {
+                const histogram = macdSignal.querySelector('.macd-histogram');
+                const text = macdSignal.querySelector('.macd-text');
+                
+                if (histogram) {
+                    histogram.classList.remove('bullish', 'bearish', 'neutral');
+                    if (data.macd === 'BULLISH') {
+                        histogram.classList.add('bullish');
+                        histogram.textContent = '▲';
+                    } else if (data.macd === 'BEARISH') {
+                        histogram.classList.add('bearish');
+                        histogram.textContent = '▼';
+                    } else {
+                        histogram.classList.add('neutral');
+                        histogram.textContent = '▬';
+                    }
+                }
+                if (text) text.textContent = data.macd;
+            }
+        }
+        
+        if (data.confluence !== undefined) {
+            const confluenceValue = document.querySelector('#confluence-score .confluence-value');
+            const confluenceFill = document.getElementById('confluence-fill');
+            
+            if (confluenceValue) confluenceValue.textContent = data.confluence;
+            if (confluenceFill) confluenceFill.style.width = `${(data.confluence / 5) * 100}%`;
         }
     }
     

@@ -34,6 +34,11 @@
         <div class="dashboard-grid">
             <section class="charts-section">
                 <h2>Live Price Charts</h2>
+                <div class="strategy-selector" id="strategy-selector">
+                    <span class="strategy-label">Strategy:</span>
+                    <span class="strategy-name" id="current-strategy">MULTI_INDICATOR</span>
+                </div>
+
                 <div id="signal-container">
                     <div id="signal" class="neutral">
                         <div class="signal-content">
@@ -42,6 +47,137 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="strategy-panels" id="strategy-panels">
+                    <div class="strategy-panel ldp-panel" id="ldp-panel" style="display: none;">
+                        <div class="panel-header">
+                            <span class="panel-title">LDP - Last Digit Prediction</span>
+                            <span class="panel-badge ldp">DIGIT</span>
+                        </div>
+                        <div class="digit-heatmap" id="digit-heatmap">
+                            <div class="digit-cell" data-digit="0"><span class="digit-num">0</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="1"><span class="digit-num">1</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="2"><span class="digit-num">2</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="3"><span class="digit-num">3</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="4"><span class="digit-num">4</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="5"><span class="digit-num">5</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="6"><span class="digit-num">6</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="7"><span class="digit-num">7</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="8"><span class="digit-num">8</span><span class="digit-freq">0%</span></div>
+                            <div class="digit-cell" data-digit="9"><span class="digit-num">9</span><span class="digit-freq">0%</span></div>
+                        </div>
+                        <div class="ldp-stats">
+                            <div class="ldp-stat hot">
+                                <span class="ldp-stat-label">HOT DIGITS</span>
+                                <span class="ldp-stat-value" id="hot-digits">--</span>
+                            </div>
+                            <div class="ldp-stat cold">
+                                <span class="ldp-stat-label">COLD DIGITS</span>
+                                <span class="ldp-stat-value" id="cold-digits">--</span>
+                            </div>
+                        </div>
+                        <div class="zone-distribution">
+                            <div class="zone low-zone">
+                                <span class="zone-label">LOW (0-4)</span>
+                                <div class="zone-bar"><div class="zone-fill" id="low-zone-fill" style="width: 50%"></div></div>
+                                <span class="zone-pct" id="low-zone-pct">50%</span>
+                            </div>
+                            <div class="zone high-zone">
+                                <span class="zone-label">HIGH (5-9)</span>
+                                <div class="zone-bar"><div class="zone-fill" id="high-zone-fill" style="width: 50%"></div></div>
+                                <span class="zone-pct" id="high-zone-pct">50%</span>
+                            </div>
+                        </div>
+                        <div class="ldp-signal" id="ldp-signal">
+                            <span class="ldp-signal-type">DIGITOVER</span>
+                            <span class="ldp-signal-digit">5</span>
+                        </div>
+                    </div>
+
+                    <div class="strategy-panel tick-analyzer-panel" id="tick-analyzer-panel" style="display: none;">
+                        <div class="panel-header">
+                            <span class="panel-title">Tick Analyzer</span>
+                            <span class="panel-badge tick">TICK</span>
+                        </div>
+                        <div class="tick-analyzer-content">
+                            <div class="streak-section">
+                                <div class="streak-counter" id="streak-counter">
+                                    <span class="streak-direction" id="streak-direction">UP</span>
+                                    <span class="streak-count" id="streak-count">0</span>
+                                    <span class="streak-label">STREAK</span>
+                                </div>
+                            </div>
+                            <div class="momentum-section">
+                                <span class="momentum-label">Momentum</span>
+                                <div class="momentum-bar">
+                                    <div class="momentum-negative"></div>
+                                    <div class="momentum-indicator" id="momentum-indicator" style="left: 50%"></div>
+                                    <div class="momentum-positive"></div>
+                                </div>
+                                <div class="momentum-values">
+                                    <span class="momentum-bearish">BEARISH</span>
+                                    <span class="momentum-value" id="momentum-value">0.00</span>
+                                    <span class="momentum-bullish">BULLISH</span>
+                                </div>
+                            </div>
+                            <div class="pattern-section">
+                                <span class="pattern-label">Detected Patterns</span>
+                                <div class="pattern-badges" id="pattern-badges">
+                                    <span class="pattern-badge none">No pattern</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="strategy-panel multi-indicator-panel" id="multi-indicator-panel" style="display: block;">
+                        <div class="panel-header">
+                            <span class="panel-title">Multi-Indicator Analysis</span>
+                            <span class="panel-badge multi">MULTI</span>
+                        </div>
+                        <div class="indicator-grid">
+                            <div class="indicator-card">
+                                <span class="indicator-name">RSI</span>
+                                <div class="rsi-gauge">
+                                    <div class="rsi-bar">
+                                        <div class="rsi-fill" id="rsi-fill" style="width: 50%"></div>
+                                        <div class="rsi-marker" id="rsi-marker" style="left: 50%"></div>
+                                    </div>
+                                    <div class="rsi-zones">
+                                        <span class="zone-oversold">30</span>
+                                        <span class="zone-neutral">50</span>
+                                        <span class="zone-overbought">70</span>
+                                    </div>
+                                </div>
+                                <span class="indicator-value" id="rsi-value">50.00</span>
+                            </div>
+                            <div class="indicator-card">
+                                <span class="indicator-name">Trend</span>
+                                <div class="trend-indicator" id="trend-indicator">
+                                    <span class="trend-arrow">→</span>
+                                    <span class="trend-text">NEUTRAL</span>
+                                </div>
+                            </div>
+                            <div class="indicator-card">
+                                <span class="indicator-name">MACD</span>
+                                <div class="macd-signal" id="macd-signal">
+                                    <span class="macd-histogram neutral">▬</span>
+                                    <span class="macd-text">NEUTRAL</span>
+                                </div>
+                            </div>
+                            <div class="indicator-card">
+                                <span class="indicator-name">Confluence</span>
+                                <div class="confluence-score" id="confluence-score">
+                                    <span class="confluence-value">0</span>
+                                    <span class="confluence-max">/5</span>
+                                </div>
+                                <div class="confluence-bar">
+                                    <div class="confluence-fill" id="confluence-fill" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="tick-picker-panel">
                     <div class="tick-picker-header">
                         <span class="tick-picker-title">Tick Picker</span>
