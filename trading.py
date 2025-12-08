@@ -50,7 +50,15 @@ from hybrid_money_manager import HybridMoneyManager, RiskLevel, create_small_cap
 from tick_analyzer import TickTrendAnalyzer, TickSignal, TickDirection
 from terminal_strategy import TerminalStrategy, TerminalSignal, SignalDirection as TerminalSignalDirection
 from accumulator_strategy import AccumulatorStrategy, AccumulatorSignal, AccumulatorDirection
-from entry_filter import HighChanceEntryFilter, create_high_probability_filter, create_sniper_filter, RiskMode
+from entry_filter import (
+    HighChanceEntryFilter, 
+    create_high_probability_filter, 
+    create_sniper_filter, 
+    create_digit_strategy_filter,
+    create_terminal_filter,
+    create_accumulator_filter,
+    RiskMode
+)
 from symbols import (
     SUPPORTED_SYMBOLS, 
     DEFAULT_SYMBOL, 
@@ -417,15 +425,17 @@ class TradingManager:
         Pre-load historical tick data untuk symbol yang dipilih.
         
         Mengambil historical ticks dari Deriv API dan memasukkannya
-        ke strategy sehingga analisis bisa langsung dimulai tanpa
-        menunggu tick terkumpul.
+        ke SEMUA strategy yang aktif sehingga analisis bisa langsung dimulai
+        tanpa menunggu tick terkumpul.
         
         Returns:
             True jika preload berhasil, False jika gagal
         """
         import time as time_module
         
-        required_ticks = self.required_ticks + 30  # Extra buffer untuk indicator calculation
+        # Untuk strategi digit-based, butuh lebih banyak tick (min 50)
+        min_ticks_for_digit = 60  # Extra buffer untuk digit analysis
+        required_ticks = max(self.required_ticks + 30, min_ticks_for_digit)
         
         logger.info(f"📥 Pre-loading {required_ticks} historical ticks for {self.symbol}...")
         
@@ -438,9 +448,27 @@ class TradingManager:
             
             if prices and len(prices) >= self.required_ticks:
                 for price in prices:
-                    self.strategy.add_tick(float(price))
+                    price_float = float(price)
+                    # Add tick to main strategy
+                    self.strategy.add_tick(price_float)
+                    
+                    # Add tick to LDP strategy if active (for DIGITPAD and LDP modes)
+                    if self.ldp_strategy:
+                        self.ldp_strategy.add_tick(price_float)
+                    
+                    # Add tick to Tick Analyzer if active
+                    if self.tick_analyzer:
+                        self.tick_analyzer.add_tick(price_float)
+                    
+                    # Add tick to Terminal Strategy if active
+                    if self.terminal_strategy:
+                        self.terminal_strategy.add_tick(price_float)
+                    
+                    # Add tick to Accumulator Strategy if active
+                    if self.accumulator_strategy:
+                        self.accumulator_strategy.add_tick(price_float)
                 
-                logger.info(f"✅ Pre-loaded {len(prices)} ticks for {self.symbol} - siap trading!")
+                logger.info(f"✅ Pre-loaded {len(prices)} ticks for {self.symbol} to ALL active strategies - siap trading!")
                 return True
             else:
                 ticks_received = len(prices) if prices else 0
@@ -467,7 +495,7 @@ class TradingManager:
         
         if mode == StrategyMode.LDP:
             self.ldp_strategy = LDPStrategy()
-            self.entry_filter = create_high_probability_filter()
+            self.entry_filter = create_digit_strategy_filter()  # Use digit-optimized filter
             logger.info("🎯 Strategy mode set to LDP (Last Digit Prediction)")
             result_msg = "Strategi diubah ke LDP (Last Digit Prediction)\n\n📝 Over/Under, Match/Differ, Rise/Fall berdasarkan digit terakhir"
         elif mode == StrategyMode.TICK_ANALYZER:
@@ -477,17 +505,17 @@ class TradingManager:
             result_msg = "Strategi diubah ke Tick Analyzer\n\n📝 Analisis trend tick untuk BUY/SELL"
         elif mode == StrategyMode.TERMINAL:
             self.terminal_strategy = TerminalStrategy()
-            self.entry_filter = create_high_probability_filter()
+            self.entry_filter = create_terminal_filter()  # Use terminal-optimized filter
             logger.info("🖥️ Strategy mode set to Terminal (Smart Analysis)")
             result_msg = "Strategi diubah ke Terminal\n\n📝 Smart Analysis 80% + Hybrid Recovery dengan 4 level risiko"
         elif mode == StrategyMode.DIGITPAD:
             self.ldp_strategy = LDPStrategy()
-            self.entry_filter = create_high_probability_filter()
+            self.entry_filter = create_digit_strategy_filter()  # Use digit-optimized filter
             logger.info("🔢 Strategy mode set to DigitPad")
             result_msg = "Strategi diubah ke DigitPad\n\n📝 Prediksi digit 0-9, Even/Odd dengan signals chart"
         elif mode == StrategyMode.AMT:
             self.accumulator_strategy = AccumulatorStrategy()
-            self.entry_filter = create_high_probability_filter()
+            self.entry_filter = create_accumulator_filter()  # Use accumulator-optimized filter
             logger.info("📈 Strategy mode set to AMT (Accumulator)")
             result_msg = "Strategi diubah ke AMT (Accumulator)\n\n📝 Trading accumulator dengan Take Profit/Stop Loss"
         elif mode == StrategyMode.SNIPER:

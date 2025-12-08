@@ -744,3 +744,55 @@ def create_sniper_filter() -> HighChanceEntryFilter:
         high_score_threshold=85,
     )
     return HighChanceEntryFilter(config)
+
+
+def create_digit_strategy_filter() -> HighChanceEntryFilter:
+    """
+    Factory function untuk digit-based strategy entry filter.
+    Optimized for DIGITPAD, LDP modes.
+    Minimum confidence: 55% (sesuai MIN_CONFIDENCE di LDP strategy)
+    Does not require trend alignment (digit prediction independent of trend).
+    Lower minimum score for more frequent trading.
+    """
+    config = EntryFilterConfig(
+        risk_mode=RiskMode.AGGRESSIVE,
+        min_confidence_aggressive=0.55,
+        require_trend_alignment=False,
+        block_extreme_volatility=False,
+        min_entry_score=40,
+    )
+    return HighChanceEntryFilter(config)
+
+
+def create_terminal_filter() -> HighChanceEntryFilter:
+    """
+    Factory function untuk Terminal strategy entry filter.
+    Medium-high probability focus.
+    Minimum confidence: 70%
+    Requires trend alignment for better accuracy.
+    """
+    config = EntryFilterConfig(
+        risk_mode=RiskMode.LOW_RISK,
+        min_confidence_low_risk=0.70,
+        require_trend_alignment=True,
+        block_extreme_volatility=True,
+        min_entry_score=55,
+    )
+    return HighChanceEntryFilter(config)
+
+
+def create_accumulator_filter() -> HighChanceEntryFilter:
+    """
+    Factory function untuk AMT (Accumulator) strategy entry filter.
+    Conservative approach for accumulator trades.
+    Minimum confidence: 65%
+    Requires trend alignment.
+    """
+    config = EntryFilterConfig(
+        risk_mode=RiskMode.LOW_RISK,
+        min_confidence_low_risk=0.65,
+        require_trend_alignment=True,
+        block_extreme_volatility=True,
+        min_entry_score=50,
+    )
+    return HighChanceEntryFilter(config)
