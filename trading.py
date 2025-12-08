@@ -48,6 +48,9 @@ from deriv_ws import DerivWebSocket, AccountType
 from ldp_strategy import LDPStrategy, LDPSignal, LDPAnalysisResult, LDPContractType
 from hybrid_money_manager import HybridMoneyManager, RiskLevel, create_small_capital_manager
 from tick_analyzer import TickTrendAnalyzer, TickSignal, TickDirection
+from terminal_strategy import TerminalStrategy, TerminalSignal, SignalDirection as TerminalSignalDirection
+from accumulator_strategy import AccumulatorStrategy, AccumulatorSignal, AccumulatorDirection
+from entry_filter import HighChanceEntryFilter, create_high_probability_filter, create_sniper_filter, RiskMode
 from symbols import (
     SUPPORTED_SYMBOLS, 
     DEFAULT_SYMBOL, 
@@ -376,6 +379,11 @@ class TradingManager:
         self.money_manager: Optional[HybridMoneyManager] = None
         self.use_hybrid_money_manager: bool = False
         
+        # New strategy integrations
+        self.terminal_strategy: Optional[TerminalStrategy] = None
+        self.accumulator_strategy: Optional[AccumulatorStrategy] = None
+        self.entry_filter: Optional[HighChanceEntryFilter] = None
+        
         # Callbacks untuk notifikasi Telegram
         self.on_trade_opened: Optional[Callable] = None
         self.on_trade_closed: Optional[Callable] = None
@@ -458,26 +466,36 @@ class TradingManager:
         
         if mode == StrategyMode.LDP:
             self.ldp_strategy = LDPStrategy()
+            self.entry_filter = create_high_probability_filter()
             logger.info("🎯 Strategy mode set to LDP (Last Digit Prediction)")
             return "Strategi diubah ke LDP (Last Digit Prediction)\n\n📝 Over/Under, Match/Differ, Rise/Fall berdasarkan digit terakhir"
         elif mode == StrategyMode.TICK_ANALYZER:
             self.tick_analyzer = TickTrendAnalyzer()
+            self.entry_filter = create_high_probability_filter()
             logger.info("📈 Strategy mode set to Tick Analyzer")
             return "Strategi diubah ke Tick Analyzer\n\n📝 Analisis trend tick untuk BUY/SELL"
         elif mode == StrategyMode.TERMINAL:
+            self.terminal_strategy = TerminalStrategy()
+            self.entry_filter = create_high_probability_filter()
             logger.info("🖥️ Strategy mode set to Terminal (Smart Analysis)")
             return "Strategi diubah ke Terminal\n\n📝 Smart Analysis 80% + Hybrid Recovery dengan 4 level risiko"
         elif mode == StrategyMode.DIGITPAD:
             self.ldp_strategy = LDPStrategy()
+            self.entry_filter = create_high_probability_filter()
             logger.info("🔢 Strategy mode set to DigitPad")
             return "Strategi diubah ke DigitPad\n\n📝 Prediksi digit 0-9, Even/Odd dengan signals chart"
         elif mode == StrategyMode.AMT:
+            self.accumulator_strategy = AccumulatorStrategy()
+            self.entry_filter = create_high_probability_filter()
             logger.info("📈 Strategy mode set to AMT (Accumulator)")
             return "Strategi diubah ke AMT (Accumulator)\n\n📝 Trading accumulator dengan Take Profit/Stop Loss"
         elif mode == StrategyMode.SNIPER:
+            self.terminal_strategy = TerminalStrategy()
+            self.entry_filter = create_sniper_filter()
             logger.info("🎯 Strategy mode set to Sniper")
             return "Strategi diubah ke Sniper\n\n📝 High probability entry dengan strategy selector"
         else:
+            self.entry_filter = create_high_probability_filter()
             logger.info("📊 Strategy mode set to Multi-Indicator (default)")
             return "Strategi diubah ke Multi-Indicator (default)\n\n📝 RSI + EMA + MACD + Trend Analysis"
     
@@ -502,8 +520,62 @@ class TradingManager:
             info.append(f"❄️ Cold digits: {stats['cold_digits']}")
         elif self.strategy_mode == StrategyMode.TICK_ANALYZER and self.tick_analyzer:
             info.append(self.tick_analyzer.get_summary())
+        elif self.strategy_mode == StrategyMode.TERMINAL and self.terminal_strategy:
+            stats = self.terminal_strategy.get_stats()
+            info.append(f"🖥️ Terminal Ticks: {stats.get('tick_count', 0)}")
+            info.append(f"📊 Risk Level: {stats.get('risk_level', 'N/A')}")
+        elif self.strategy_mode == StrategyMode.AMT and self.accumulator_strategy:
+            stats = self.accumulator_strategy.get_stats()
+            info.append(f"📈 AMT Ticks: {stats.get('total_ticks', 0)}")
+            info.append(f"↗️ Up Ratio: {stats.get('up_ratio', 0.5):.1%}")
+        elif self.strategy_mode == StrategyMode.SNIPER and self.terminal_strategy:
+            stats = self.terminal_strategy.get_stats()
+            info.append(f"🎯 Sniper Ticks: {stats.get('tick_count', 0)}")
+            info.append(f"📊 Risk Level: {stats.get('risk_level', 'N/A')}")
+        
+        # Add entry filter stats if available
+        if self.entry_filter:
+            filter_stats = self.entry_filter.get_filter_stats()
+            info.append(f"🎯 Filter: {filter_stats.get('allowed_entries', 0)} allowed / {filter_stats.get('blocked_entries', 0)} blocked")
         
         return "\n".join(info)
+    
+    def get_entry_filter_stats(self) -> Dict[str, Any]:
+        """
+        Get entry filter statistics.
+        
+        Returns:
+            Dictionary containing filter statistics including:
+            - total_signals: Total signals processed
+            - allowed_entries: Number of entries allowed
+            - blocked_entries: Number of entries blocked
+            - blocked_by_confidence: Blocked due to low confidence
+            - blocked_by_volatility: Blocked due to high volatility
+            - blocked_by_trend: Blocked due to trend misalignment
+            - allow_rate: Percentage of allowed entries
+            - block_rate: Percentage of blocked entries
+        """
+        if self.entry_filter:
+            return self.entry_filter.get_filter_stats()
+        else:
+            return {
+                "total_signals": 0,
+                "allowed_entries": 0,
+                "blocked_entries": 0,
+                "blocked_by_confidence": 0,
+                "blocked_by_volatility": 0,
+                "blocked_by_trend": 0,
+                "blocked_by_session": 0,
+                "blocked_by_score": 0,
+                "average_score": 0.0,
+                "high_score_entries": 0,
+                "allow_rate": 0.0,
+                "block_rate": 0.0,
+                "current_risk_mode": "N/A",
+                "min_confidence": 0.0,
+                "min_entry_score": 0,
+                "message": "Entry filter not initialized"
+            }
         
     def _on_tick(self, price: float, symbol: str):
         """
@@ -522,6 +594,14 @@ class TradingManager:
         # Add tick to Tick Analyzer if it exists
         if self.tick_analyzer:
             self.tick_analyzer.add_tick(price)
+        
+        # Add tick to Terminal Strategy if it exists
+        if self.terminal_strategy:
+            self.terminal_strategy.add_tick(price)
+        
+        # Add tick to Accumulator Strategy if it exists
+        if self.accumulator_strategy:
+            self.accumulator_strategy.add_tick(price)
         
         # Check buy timeout dulu sebelum check state
         if self.buy_request_time > 0:
@@ -1719,6 +1799,133 @@ class TradingManager:
                     signal = Signal.WAIT
                     reason = "Tick Analyzer: Menunggu pattern..."
         
+        elif self.strategy_mode == StrategyMode.TERMINAL:
+            # Use Terminal Strategy with Smart Analysis
+            if self.terminal_strategy:
+                terminal_signal = self.terminal_strategy.get_signal_for_trading()
+                stats = self.terminal_strategy.get_stats()
+                tick_count = stats.get('tick_count', 0)
+                last_price = list(self.terminal_strategy.tick_history)[-1] if self.terminal_strategy.tick_history else 0.0
+                
+                if terminal_signal:
+                    confidence = terminal_signal.confidence
+                    reason = terminal_signal.reason
+                    
+                    # Convert Terminal signal direction to unified Signal
+                    if terminal_signal.direction == TerminalSignalDirection.CALL:
+                        signal = Signal.BUY
+                        trend_direction = "UP"
+                    elif terminal_signal.direction == TerminalSignalDirection.PUT:
+                        signal = Signal.SELL
+                        trend_direction = "DOWN"
+                    else:
+                        signal = Signal.WAIT
+                        trend_direction = "SIDEWAYS"
+                    
+                    logger.debug(f"Terminal signal: {terminal_signal.direction.value}, conf={confidence:.2f}")
+                else:
+                    signal = Signal.WAIT
+                    reason = "Terminal: Menunggu Smart Analysis signal..."
+        
+        elif self.strategy_mode == StrategyMode.AMT:
+            # Use Accumulator Strategy
+            if self.accumulator_strategy:
+                acc_signal = self.accumulator_strategy.get_signal_for_trading()
+                stats = self.accumulator_strategy.get_stats()
+                tick_count = stats.get('total_ticks', 0)
+                last_price = stats.get('current_price', 0.0)
+                
+                if acc_signal:
+                    confidence = acc_signal.confidence
+                    reason = acc_signal.reason
+                    
+                    # Convert Accumulator signal direction to unified Signal
+                    if acc_signal.direction == AccumulatorDirection.CALL:
+                        signal = Signal.BUY
+                        trend_direction = "UP"
+                    elif acc_signal.direction == AccumulatorDirection.PUT:
+                        signal = Signal.SELL
+                        trend_direction = "DOWN"
+                    else:
+                        signal = Signal.WAIT
+                        trend_direction = "SIDEWAYS"
+                    
+                    logger.debug(f"AMT signal: {acc_signal.direction.value}, conf={confidence:.2f}")
+                else:
+                    signal = Signal.WAIT
+                    reason = "AMT: Menunggu trend yang kuat..."
+        
+        elif self.strategy_mode == StrategyMode.DIGITPAD:
+            # Use LDP Strategy for DigitPad with best signal for small capital
+            if self.ldp_strategy:
+                best_signal = self.ldp_strategy.get_best_signal_for_small_capital()
+                stats = self.ldp_strategy.get_stats()
+                tick_count = stats.get('tick_count', 0)
+                last_price = list(self.ldp_strategy.tick_history)[-1] if self.ldp_strategy.tick_history else 0.0
+                
+                # Prepare LDP data for SignalEvent
+                ldp_data = {
+                    "hot_digits": stats.get('hot_digits', []),
+                    "cold_digits": stats.get('cold_digits', []),
+                    "low_zone_pct": stats.get('low_zone_percentage', 0.5),
+                    "high_zone_pct": stats.get('high_zone_percentage', 0.5),
+                    "pattern": stats.get('pattern', 'NEUTRAL')
+                }
+                
+                if best_signal:
+                    confidence = best_signal.confidence
+                    reason = best_signal.reason
+                    
+                    # Convert LDP signal to unified Signal for DigitPad
+                    if best_signal.contract_type in [LDPContractType.DIGITOVER, LDPContractType.DIGITEVEN, LDPContractType.DIGITMATCH]:
+                        signal = Signal.BUY
+                        trend_direction = "UP"
+                    elif best_signal.contract_type in [LDPContractType.DIGITUNDER, LDPContractType.DIGITODD, LDPContractType.DIGITDIFF]:
+                        signal = Signal.SELL
+                        trend_direction = "DOWN"
+                    else:
+                        signal = Signal.WAIT
+                        trend_direction = "SIDEWAYS"
+                    
+                    # Update LDP data with signal info
+                    ldp_data["contract_type"] = best_signal.contract_type.value
+                    ldp_data["prediction"] = best_signal.prediction
+                    ldp_data["risk_level"] = best_signal.risk_level
+                else:
+                    signal = Signal.WAIT
+                    reason = "DigitPad: Menunggu pattern digit yang optimal..."
+        
+        elif self.strategy_mode == StrategyMode.SNIPER:
+            # Use Terminal Strategy with Sniper filter for highest probability
+            if self.terminal_strategy:
+                terminal_signal = self.terminal_strategy.get_signal_for_trading()
+                stats = self.terminal_strategy.get_stats()
+                tick_count = stats.get('tick_count', 0)
+                last_price = list(self.terminal_strategy.tick_history)[-1] if self.terminal_strategy.tick_history else 0.0
+                
+                if terminal_signal and terminal_signal.confidence >= 0.85:
+                    confidence = terminal_signal.confidence
+                    reason = f"Sniper: {terminal_signal.reason}"
+                    
+                    # Convert Terminal signal direction to unified Signal
+                    if terminal_signal.direction == TerminalSignalDirection.CALL:
+                        signal = Signal.BUY
+                        trend_direction = "UP"
+                    elif terminal_signal.direction == TerminalSignalDirection.PUT:
+                        signal = Signal.SELL
+                        trend_direction = "DOWN"
+                    else:
+                        signal = Signal.WAIT
+                        trend_direction = "SIDEWAYS"
+                    
+                    logger.debug(f"Sniper signal: {terminal_signal.direction.value}, conf={confidence:.2f}")
+                else:
+                    signal = Signal.WAIT
+                    if terminal_signal:
+                        reason = f"Sniper: Confidence {terminal_signal.confidence:.1%} < 85% threshold"
+                    else:
+                        reason = "Sniper: Menunggu high probability entry..."
+        
         return (signal, confidence, reason, trend_direction, tick_count, last_price,
                 rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data)
     
@@ -1789,6 +1996,54 @@ class TradingManager:
                 )
                 get_event_bus().publish("signal", signal_event)
                 return
+            
+            # Apply entry filter check before executing any trade
+            if self.entry_filter:
+                # Get volatility for filter (try from strategy stats)
+                volatility = 0.0
+                try:
+                    vol_zone, vol_mult = self.strategy.get_volatility_zone()
+                    volatility = 0.002 if vol_zone == "LOW" else 0.004 if vol_zone == "NORMAL" else 0.008
+                except Exception:
+                    volatility = 0.003  # Default normal volatility
+                
+                # Determine signal direction string for filter
+                signal_direction = "CALL" if signal == Signal.BUY else "PUT"
+                
+                # Check if entry should be allowed
+                filter_allowed = self.entry_filter.should_allow_entry(
+                    signal_confidence=confidence,
+                    volatility=volatility,
+                    trend_direction=trend_direction,
+                    signal_direction=signal_direction
+                )
+                
+                if not filter_allowed:
+                    filter_stats = self.entry_filter.get_filter_stats()
+                    logger.info(f"🚫 Entry Filter BLOCKED: conf={confidence:.2f}, trend={trend_direction}, "
+                               f"signal={signal_direction}, blocked_count={filter_stats.get('blocked_entries', 0)}")
+                    
+                    # Publish FILTERED signal untuk dashboard
+                    signal_event = SignalEvent(
+                        signal_type="FILTERED",
+                        symbol=self.symbol,
+                        confidence=confidence,
+                        trend_direction=trend_direction,
+                        tick_count=tick_count,
+                        last_price=last_price,
+                        reason=f"Entry filtered: {reason}",
+                        rsi_value=rsi_value,
+                        adx_value=adx_value,
+                        tick_picker=tick_picker_data,
+                        strategy_mode=strategy_mode_name,
+                        ldp_data=ldp_data,
+                        tick_analyzer_data=tick_analyzer_data
+                    )
+                    get_event_bus().publish("signal", signal_event)
+                    return
+                else:
+                    filter_stats = self.entry_filter.get_filter_stats()
+                    logger.debug(f"✅ Entry Filter ALLOWED: conf={confidence:.2f}, allowed_count={filter_stats.get('allowed_entries', 0)}")
                 
             # Ada signal! Set flag processing SEBELUM eksekusi (inside lock)
             self.is_processing_signal = True
