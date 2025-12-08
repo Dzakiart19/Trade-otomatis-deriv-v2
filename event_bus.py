@@ -220,6 +220,9 @@ class SignalEvent:
     rsi_value: float = 50.0
     adx_value: float = 0.0
     tick_picker: Optional[dict] = None
+    strategy_mode: str = "multi_indicator"  # Active strategy mode
+    ldp_data: Optional[dict] = None  # LDP strategy data (digit_stats, hot_digits, cold_digits, zones)
+    tick_analyzer_data: Optional[dict] = None  # Tick analyzer data (streak, momentum, pattern)
     timestamp: datetime = field(default_factory=datetime.now)
     
     def to_dict(self) -> dict:
@@ -234,10 +237,15 @@ class SignalEvent:
             "reason": self.reason,
             "rsi_value": self.rsi_value,
             "adx_value": self.adx_value,
+            "strategy_mode": self.strategy_mode,
             "timestamp": self.timestamp.isoformat()
         }
         if self.tick_picker:
             result["tick_picker"] = self.tick_picker
+        if self.ldp_data:
+            result["ldp_data"] = self.ldp_data
+        if self.tick_analyzer_data:
+            result["tick_analyzer_data"] = self.tick_analyzer_data
         return result
 
 

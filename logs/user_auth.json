@@ -1,14 +1,1 @@
-{
-  "7873001910": {
-    "user_id": 7873001910,
-    "username": "alwayshyperz",
-    "account_type": "demo",
-    "encrypted_token": "Z0FBQUFBQnBOYUhNX0w4cUNlbnFRcjY3TC0teDdDZHphYXRGdDdwRnVwYlo0UGNsenFkb1BxLWZMS0s4UGZOcVpwcGl1TVRJZlhmZGtmYW5ZWmFENVM1SDZBZzE2YVBsUEE9PQ==",
-    "token_fingerprint": "25ad422b4c63f2cd",
-    "created_at": "2025-12-07T15:48:28.153629",
-    "last_used": "2025-12-07T15:48:28.153629",
-    "login_attempts": 0,
-    "lockout_until": 0,
-    "language_code": "id"
-  }
-}
+{}

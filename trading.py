@@ -495,8 +495,16 @@ class TradingManager:
         """
         import time as time_module
         
-        # Tambahkan tick ke strategy
+        # Tambahkan tick ke semua strategi aktif
         self.strategy.add_tick(price)
+        
+        # Add tick to LDP strategy if it exists
+        if self.ldp_strategy:
+            self.ldp_strategy.add_tick(price)
+        
+        # Add tick to Tick Analyzer if it exists
+        if self.tick_analyzer:
+            self.tick_analyzer.add_tick(price)
         
         # Check buy timeout dulu sebelum check state
         if self.buy_request_time > 0:
@@ -1558,12 +1566,153 @@ class TradingManager:
         except Exception as e:
             logger.error(f"Error during log cleanup: {e}")
             
+    def _get_unified_signal(self) -> tuple:
+        """
+        Get unified signal from the active strategy.
+        
+        Returns:
+            Tuple of (signal: Signal, confidence: float, reason: str, 
+                     trend_direction: str, tick_count: int, last_price: float,
+                     rsi_value: float, adx_value: float, tick_picker_data: dict,
+                     ldp_data: dict, tick_analyzer_data: dict)
+        """
+        # Default values
+        signal = Signal.WAIT
+        confidence = 0.0
+        reason = "Menunggu sinyal..."
+        trend_direction = "SIDEWAYS"
+        tick_count = 0
+        last_price = 0.0
+        rsi_value = 50.0
+        adx_value = 0.0
+        tick_picker_data = None
+        ldp_data = None
+        tick_analyzer_data = None
+        
+        if self.strategy_mode == StrategyMode.MULTI_INDICATOR:
+            # Use Multi-Indicator strategy (default)
+            analysis = self.strategy.analyze()
+            if analysis:
+                signal = analysis.signal
+                confidence = analysis.confidence
+                reason = analysis.reason or "Multi-Indicator analysis"
+                trend_direction = analysis.trend_direction.upper() if analysis.trend_direction else "SIDEWAYS"
+                rsi_value = analysis.rsi_value
+                adx_value = analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0
+                
+                stats = self.strategy.get_stats()
+                tick_count = stats.get('tick_count', 0)
+                last_price = stats.get('last_tick', 0.0)
+                
+                if analysis.tick_picker:
+                    tick_picker_data = {
+                        "tick_up_count": analysis.tick_picker.tick_up_count,
+                        "tick_down_count": analysis.tick_picker.tick_down_count,
+                        "total_analyzed": analysis.tick_picker.total_analyzed,
+                        "up_percentage": analysis.tick_picker.up_percentage,
+                        "down_percentage": analysis.tick_picker.down_percentage,
+                        "signal_direction": analysis.tick_picker.signal_direction,
+                        "signal_confidence": analysis.tick_picker.signal_confidence,
+                        "window_size": analysis.tick_picker.window_size
+                    }
+        
+        elif self.strategy_mode == StrategyMode.LDP:
+            # Use LDP Strategy
+            if self.ldp_strategy:
+                ldp_result = self.ldp_strategy.analyze()
+                stats = self.ldp_strategy.get_stats()
+                tick_count = stats.get('tick_count', 0)
+                last_price = list(self.ldp_strategy.tick_history)[-1] if self.ldp_strategy.tick_history else 0.0
+                
+                # Prepare LDP data for SignalEvent
+                ldp_data = {
+                    "hot_digits": stats.get('hot_digits', []),
+                    "cold_digits": stats.get('cold_digits', []),
+                    "low_zone_pct": stats.get('low_zone_percentage', 0.5),
+                    "high_zone_pct": stats.get('high_zone_percentage', 0.5),
+                    "pattern": stats.get('pattern', 'NEUTRAL')
+                }
+                
+                if ldp_result and ldp_result.best_signal:
+                    best_signal = ldp_result.best_signal
+                    confidence = best_signal.confidence
+                    reason = best_signal.reason
+                    
+                    # Convert LDP signal to unified Signal
+                    # DIGITOVER, DIGITEVEN -> CALL (predict higher/even)
+                    # DIGITUNDER, DIGITODD -> PUT (predict lower/odd)
+                    if best_signal.contract_type in [LDPContractType.DIGITOVER, LDPContractType.DIGITEVEN, LDPContractType.DIGITMATCH]:
+                        signal = Signal.BUY
+                        trend_direction = "UP"
+                    elif best_signal.contract_type in [LDPContractType.DIGITUNDER, LDPContractType.DIGITODD, LDPContractType.DIGITDIFF]:
+                        signal = Signal.SELL
+                        trend_direction = "DOWN"
+                    else:
+                        signal = Signal.WAIT
+                        trend_direction = "SIDEWAYS"
+                    
+                    # Update LDP data with signal info
+                    ldp_data["contract_type"] = best_signal.contract_type.value
+                    ldp_data["prediction"] = best_signal.prediction
+                    ldp_data["risk_level"] = best_signal.risk_level
+                else:
+                    # No valid signal from LDP
+                    signal = Signal.WAIT
+                    reason = "LDP: Menunggu pattern yang valid..."
+        
+        elif self.strategy_mode == StrategyMode.TICK_ANALYZER:
+            # Use Tick Analyzer Strategy
+            if self.tick_analyzer:
+                tick_signal = self.tick_analyzer.analyze()
+                summary = self.tick_analyzer.get_stats()
+                tick_count = summary.get('total_ticks', 0)
+                last_price = summary.get('last_price', 0.0)
+                
+                # Prepare tick analyzer data for SignalEvent
+                tick_analyzer_data = {
+                    "up_ticks": summary.get('up_ticks', 0),
+                    "down_ticks": summary.get('down_ticks', 0),
+                    "up_ratio": summary.get('up_ratio', 0.5),
+                    "current_streak": summary.get('current_streak', 0),
+                    "streak_direction": summary.get('streak_direction', 'NEUTRAL'),
+                    "max_up_streak": summary.get('max_up_streak', 0),
+                    "max_down_streak": summary.get('max_down_streak', 0)
+                }
+                
+                if tick_signal:
+                    confidence = tick_signal.confidence
+                    reason = tick_signal.reason
+                    
+                    # Convert TickSignal to unified Signal
+                    if tick_signal.direction == TickDirection.UP:
+                        signal = Signal.BUY
+                        trend_direction = "UP"
+                    elif tick_signal.direction == TickDirection.DOWN:
+                        signal = Signal.SELL
+                        trend_direction = "DOWN"
+                    else:
+                        signal = Signal.WAIT
+                        trend_direction = "SIDEWAYS"
+                    
+                    # Update tick analyzer data with signal info
+                    tick_analyzer_data["pattern"] = tick_signal.pattern.value
+                    tick_analyzer_data["strength"] = tick_signal.strength.value
+                else:
+                    # No valid signal from Tick Analyzer
+                    signal = Signal.WAIT
+                    reason = "Tick Analyzer: Menunggu pattern..."
+        
+        return (signal, confidence, reason, trend_direction, tick_count, last_price,
+                rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data)
+    
     def _check_and_execute_signal(self):
         """
         Cek signal dari strategi dan eksekusi jika ada.
         Dipanggil setiap tick baru masuk.
         
         Thread-safe menggunakan _signal_lock untuk mencegah concurrent trade execution.
+        
+        Enhanced: Now supports multiple strategy modes (Multi-Indicator, LDP, Tick Analyzer)
         """
         import time as time_module
         
@@ -1596,42 +1745,30 @@ class TradingManager:
                 # State sudah di-reset oleh _check_buy_timeout
                 logger.debug("Buy timeout detected, state reset")
                 return
-                
-            # Dapatkan analisis dari strategy
-            analysis = self.strategy.analyze()
             
-            # Publish SignalEvent ke dashboard untuk tick-picker display
-            stats = self.strategy.get_stats()
-            last_price = stats.get('last_tick', 0.0)
-            tick_count = stats.get('tick_count', 0)
+            # Get unified signal from active strategy (based on strategy_mode)
+            (signal, confidence, reason, trend_direction, tick_count, last_price,
+             rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data) = self._get_unified_signal()
             
-            if analysis.signal == Signal.WAIT:
-                # Prepare tick_picker data untuk dashboard
-                tick_picker_data = None
-                if analysis.tick_picker:
-                    tick_picker_data = {
-                        "tick_up_count": analysis.tick_picker.tick_up_count,
-                        "tick_down_count": analysis.tick_picker.tick_down_count,
-                        "total_analyzed": analysis.tick_picker.total_analyzed,
-                        "up_percentage": analysis.tick_picker.up_percentage,
-                        "down_percentage": analysis.tick_picker.down_percentage,
-                        "signal_direction": analysis.tick_picker.signal_direction,
-                        "signal_confidence": analysis.tick_picker.signal_confidence,
-                        "window_size": analysis.tick_picker.window_size
-                    }
-                
+            # Current strategy mode name
+            strategy_mode_name = self.strategy_mode.value
+            
+            if signal == Signal.WAIT:
                 # Publish ANALYZING/WAIT signal untuk dashboard
                 signal_event = SignalEvent(
                     signal_type="WAIT",
                     symbol=self.symbol,
-                    confidence=analysis.confidence,
-                    trend_direction=analysis.trend_direction.upper() if analysis.trend_direction else "SIDEWAYS",
+                    confidence=confidence,
+                    trend_direction=trend_direction,
                     tick_count=tick_count,
                     last_price=last_price,
-                    reason=analysis.reason or "Menunggu sinyal...",
-                    rsi_value=analysis.rsi_value,
-                    adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0,
-                    tick_picker=tick_picker_data
+                    reason=reason,
+                    rsi_value=rsi_value,
+                    adx_value=adx_value,
+                    tick_picker=tick_picker_data,
+                    strategy_mode=strategy_mode_name,
+                    ldp_data=ldp_data,
+                    tick_analyzer_data=tick_analyzer_data
                 )
                 get_event_bus().publish("signal", signal_event)
                 return
@@ -1640,40 +1777,29 @@ class TradingManager:
             self.is_processing_signal = True
             self.signal_processing_start_time = time_module.time()
             
-            contract_type = analysis.signal.value  # "CALL" atau "PUT"
-            
-            # Prepare tick_picker data untuk dashboard
-            tick_picker_data = None
-            if analysis.tick_picker:
-                tick_picker_data = {
-                    "tick_up_count": analysis.tick_picker.tick_up_count,
-                    "tick_down_count": analysis.tick_picker.tick_down_count,
-                    "total_analyzed": analysis.tick_picker.total_analyzed,
-                    "up_percentage": analysis.tick_picker.up_percentage,
-                    "down_percentage": analysis.tick_picker.down_percentage,
-                    "signal_direction": analysis.tick_picker.signal_direction,
-                    "signal_confidence": analysis.tick_picker.signal_confidence,
-                    "window_size": analysis.tick_picker.window_size
-                }
+            contract_type = signal.value  # "CALL" atau "PUT"
             
             # Publish BUY/SELL signal ke dashboard
             signal_type = "BUY" if contract_type == "CALL" else "SELL"
             signal_event = SignalEvent(
                 signal_type=signal_type,
                 symbol=self.symbol,
-                confidence=analysis.confidence,
-                trend_direction=analysis.trend_direction.upper() if analysis.trend_direction else "SIDEWAYS",
+                confidence=confidence,
+                trend_direction=trend_direction,
                 tick_count=tick_count,
                 last_price=last_price,
-                reason=analysis.reason or f"Signal {signal_type}",
-                rsi_value=analysis.rsi_value,
-                adx_value=analysis.adx_value if hasattr(analysis, 'adx_value') else 0.0,
-                tick_picker=tick_picker_data
+                reason=reason,
+                rsi_value=rsi_value,
+                adx_value=adx_value,
+                tick_picker=tick_picker_data,
+                strategy_mode=strategy_mode_name,
+                ldp_data=ldp_data,
+                tick_analyzer_data=tick_analyzer_data
             )
             get_event_bus().publish("signal", signal_event)
             
-            logger.info(f"📊 Signal: {contract_type} | RSI: {analysis.rsi_value} | "
-                       f"Confidence: {analysis.confidence:.2f} | Reason: {analysis.reason}")
+            logger.info(f"📊 [{strategy_mode_name}] Signal: {contract_type} | "
+                       f"Confidence: {confidence:.2f} | Reason: {reason}")
             
             # Execute trade while holding lock to prevent concurrent execution
             self._execute_trade(contract_type)
