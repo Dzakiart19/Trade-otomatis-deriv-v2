@@ -499,6 +499,14 @@ class EventBus:
                 contract_id = event_dict.get("contract_id")
                 if contract_id:
                     self._open_positions.pop(contract_id, None)
+            
+            elif event_type == "positions_reset":
+                self._open_positions.clear()
+                reason = event_dict.get('reason', 'unknown')
+                if reason in ('session_complete', 'stop', 'emergency'):
+                    self._trade_history.clear()
+                    self._total_trades_count = 0
+                logger.debug(f"🧹 Positions and session data cleared via positions_reset event: {reason}")
                     
             elif event_type == "trade_history":
                 self._trade_history.append(event_dict)
