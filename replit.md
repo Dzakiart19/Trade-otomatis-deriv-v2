@@ -1,7 +1,7 @@
 # Deriv Auto Trading Bot
 
 ## Overview
-This project is an automated trading bot designed for the Deriv Binary Options platform. It utilizes a multi-indicator strategy (RSI, EMA, MACD, Stochastic) combined with an Adaptive Martingale system for automatic trading. Built with Python, it connects to the Deriv API via WebSockets for real-time data and trade execution. The bot aims to automate trading decisions, manage risk, and provide real-time monitoring and analytics, making it suitable for both short-term and long-term trading strategies on various volatility indices and forex pairs.
+This project is an automated trading bot for the Deriv Binary Options platform, utilizing a multi-indicator strategy (RSI, EMA, MACD, Stochastic) and an Adaptive Martingale system. Built with Python, it connects to the Deriv API via WebSockets for real-time data and trade execution. The bot aims to automate trading decisions, manage risk, and provide real-time monitoring and analytics for various volatility indices and forex pairs, supporting both short-term and long-term strategies. It offers a web dashboard, Telegram integration for control and notifications, and supports multiple trading strategies.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -11,161 +11,29 @@ Do not make changes to the file `Y`.
 ## System Architecture
 
 ### UI/UX Decisions
-- **Real-time Monitoring**: Instant notifications via Telegram.
-- **Progress Notifications**: Visual progress bar during data collection.
-- **Trade Journal**: CSV logging for every trade.
-- **Error Logging**: Detailed error logs for debugging.
-- **Telegram Commands**: Interactive command-based control for starting/stopping trades, managing accounts, and checking status.
-- **Web Dashboard UI Redesign (v3.2)**:
-    - **Minimalist & Clean Design**: Modern, clutter-free interface following "Less but better" principle
-    - **Color Palette**: Neutral colors (#FFFFFF, #F5F5F5, #EAEAEA, #1A1A1A) with blue accent (#3B82F6)
-    - **Typography**: Inter font family for modern, professional appearance
-    - **Layout**: 8px grid system for consistent spacing (var(--spacing-xs) through var(--spacing-xl))
-    - **Components**: Rounded corners (var(--radius-sm) through var(--radius-lg)), soft shadows (var(--shadow-sm) through var(--shadow-lg))
-    - **Responsive Design**: Mobile-first approach with breakpoints at 768px and 480px
-    - **Reusable Components**: Cards, buttons, badges, tables, forms, status indicators
-    - **CSS Variables**: Centralized design tokens for easy theming and consistency
-- **Dynamic Strategy Panel System (v3.3)**:
-    - **Strategy-Specific UI Panels**: Each of the 7 trading strategies has unique UI components:
-        - **Multi-Indicator**: RSI gauge, MACD signal, trend indicator, confluence score
-        - **LDP**: Digit zones (Low/Mid/High), hot/cold digits, signal type display
-        - **Tick Analyzer**: Streak counter, momentum bar, pattern badges
-        - **Terminal**: Smart Analysis 80%, 4 indicator bars (RSI/EMA/MACD/Stoch), risk selector, console output
-        - **DigitPad**: 10-digit grid with frequency percentages, Even/Odd stats, signal chart
-        - **AMT**: Growth rate selector, Take Profit/Stop Loss display, P/L progress bar
-        - **Sniper**: Strategy selector, confidence meter, session stats, console output
-    - **Panel Switching**: updateStrategyPanel() dynamically shows/hides panels based on strategy_mode
-    - **Real-Time Updates**: Strategy-specific data flows from backend via SignalEvent to update panels
-    - **WebSocket Integration**: terminal_data, digitpad_data, amt_data, sniper_data fields in SignalEvent
+The system features real-time monitoring with instant Telegram notifications, CSV logging for trades, and detailed error logs. A web dashboard, redesigned for minimalism and responsiveness (mobile-first), uses a neutral color palette with a blue accent, Inter typography, and an 8px grid system. It incorporates rounded corners, soft shadows, and reusable components. Dynamic strategy panels provide unique UI elements for each of the seven trading strategies (Multi-Indicator, LDP, Tick Analyzer, Terminal, DigitPad, AMT, Sniper), with real-time updates via WebSocket integration.
 
 ### Technical Implementations
-- **Trading Strategies (v3.0)**:
-    - **Multi-Indicator**: RSI (14), EMA Crossover (9/21), MACD, Stochastic (14,3), ATR (14). Confluence scoring for signal strength.
-    - **LDP Analyzer**: Last Digit Prediction - Over/Under, Match/Differ, Rise/Fall berdasarkan digit terakhir harga.
-    - **Tick Picker**: Analisis trend tick untuk sinyal BUY/SELL dengan Martingale/Mesamilano.
-    - **Terminal**: Smart Analysis 80% probability dengan 4 level risiko (Low/Medium/High/Very High) + Hybrid Recovery.
-    - **DigitPad**: Prediksi digit 0-9, Even/Odd dengan signals chart.
-    - **AMT (Accumulator)**: Trading accumulator dengan Take Profit/Stop Loss management.
-    - **Sniper**: High probability entry dengan strategy selector.
-    - **Hybrid Money Manager**: Money management aman untuk modal kecil.
-- **Multi-Indicator Strategy Details**:
-    - **Signal Generation**: A scoring system evaluates confidence for Buy (CALL) or Sell (PUT) signals based on indicator alignments. Minimum confidence threshold of 0.50.
-    - **Advanced Filters (v2.4)**: Multi-Timeframe Trend Confirmation (M5 EMA/RSI), EMA Slope Filter, Enhanced ADX Directional Check, Volume Filter, Price Action Confirmation (wick validation), and a Signal Cooldown System.
-    - **Confluence Scoring**: Combines all filter scores (max 100 points) to determine signal strength (STRONG ≥ 70, MEDIUM ≥ 50, WEAK < 50), blocking signals below a minimum confluence score of 50.
-- **Adaptive Martingale System**:
-    - **Dynamic Multiplier**: Adjusts based on rolling win rate (Aggressive 2.5x for >60% WR, Normal 2.1x for 40-60% WR, Conservative 1.8x for <40% WR).
-    - **Levels**: Max 5 Martingale levels to limit risk.
-- **Risk Management**:
-    - Max Session Loss (20% of initial balance).
-    - Max Consecutive Losses (5x).
-    - Daily Loss Limit ($50 USD) - **HANYA aktif untuk akun REAL, skip untuk DEMO**.
-    - Balance Check before each trade.
-    - Exponential backoff for retries.
-    - Auto-Adjust Stake: Dynamically calculates and caps stake to a safe value based on projected Martingale exposure, preventing stops until balance falls below minimum stake.
-- **Session Analytics**: Tracks rolling win rate (last 20 trades), max drawdown, Martingale success rate, best performing RSI ranges, hourly P/L breakdown, and JSON export for analysis.
-- **Instant Data Preload (v2.5)**:
-    - **Historical Data Preload**: Saat bot diaktifkan, semua candle/tick data langsung dimuat dari Deriv API menggunakan `get_ticks_history()`.
-    - **No Wait Time**: Bot tidak perlu menunggu data terkumpul - langsung siap trading setelah preload selesai.
-    - **Fallback Mechanism**: Jika preload gagal, bot tetap berjalan dan mengumpulkan data dari live stream sebagai fallback.
-- **Error Handling & Stability**:
-    - Improved WebSocket reconnection with network checks and subscription clearing.
-    - Health checks with jitter and increased timeouts.
-    - Error recovery for buy failures, including timeout detection and circuit breaker.
-    - Graceful shutdown handler.
-    - Trade Journal CSV validation with atomic writes and backups.
-    - Progress callback error handling.
-- **Multi-Account Support**: Supports both Demo and Real Deriv accounts.
-- **Chat ID Persistence**: Stores and validates Telegram Chat ID for secure messaging, requiring user confirmation.
-- **Per-User Token Authentication (v2.6)**:
-    - Users login with their own Deriv API token via Telegram (/login or /start)
-    - Tokens are encrypted using Fernet (AES-128) before storage
-    - WebSocket connects using user's token automatically after login
-    - Auto-reconnect on bot restart if saved session is valid
-    - Invalid sessions are auto-cleared when decryption fails (e.g., SESSION_SECRET rotation)
-- **Real-Time Trading Notifications (v2.7)**:
-    - **Callback Registration Fix**: Trading callbacks are now set up immediately after TradingManager creation in connect_user_deriv()
-    - **Faster Updates**: Reduced notification debounce from 10s to 2s for progress, 30s to 3s for trade milestones
-    - **More Milestones**: Progress notifications at 0%, 25%, 50%, 75%, 100% for better visibility
-    - **Callback Logging**: on_trade_opened and on_trade_closed now log invocation for debugging
-- **Martingale Recovery Priority (v2.9)**:
-    - **Risk Check Override**: Saat dalam martingale sequence, stake TIDAK diturunkan oleh volatility adjustment
-    - **Higher Cap for Martingale**: Batas stake dinaikkan dari 25% ke 50% balance saat dalam martingale recovery
-    - **Stake Preservation**: Stake martingale dipertahankan di configure(), start(), dan risk check
-    - **Telegram Message Fallback**: Helper function untuk handle Markdown parsing error dengan fallback ke HTML/plain text
-    - **Session Recovery Validation**: Validasi umur file (30 menit max), data integrity check, dan martingale level validation
-- **User Stake Priority (v2.10)**:
-    - **DIHAPUS Auto-Cap 25%**: User bebas stake berapa saja selama balance mencukupi
-    - **Validasi Minimal**: Hanya validasi: stake >= minimum DAN stake <= balance
-    - **Martingale Tanpa Cap**: Martingale berjalan penuh tanpa batasan persentase
-    - **User Control**: Stake yang dikonfigurasi user digunakan langsung tanpa modifikasi otomatis
-- **Dashboard Position Sync Fix (v3.3)**:
-    - **PositionsResetEvent**: New event type in EventBus to signal dashboard to clear all positions
-    - **Session Complete Cleanup**: When trading stops or completes, broadcasts PositionsResetEvent then clears EventBus
-    - **Dashboard Handler**: Frontend handles `positions_reset` event, clears all positions and entry markers
-    - **No Analytics Corruption**: Unlike fake PositionCloseEvents, PositionsResetEvent doesn't create false trade history
-- **Tick Direction Predictor (v2.11)**:
-    - **Multi-Factor Prediction**: Prediksi arah tick 5-10 kedepan menggunakan analisis multi-faktor tertimbang
-    - **Momentum Analysis (25%)**: Deteksi akselerasi/deselerasi harga dari 15 tick terakhir
-    - **Tick Sequence Pattern (20%)**: Analisis pola consecutive up/down ticks
-    - **EMA Slope Strength (20%)**: Kekuatan crossover dan slope EMA
-    - **MACD Momentum (15%)**: Arah dan kekuatan histogram MACD
-    - **Stochastic Direction (10%)**: K/D crossover untuk konfirmasi
-    - **ADX Trend Confirmation (10%)**: Boost confidence saat trend kuat
-    - **Signal Blocking**: Sinyal BUY diblok jika prediksi bukan "UP" atau confidence < 60%, begitu juga SELL
-    - **Minimum Confidence**: Threshold 0.60 untuk memastikan prediksi cukup kuat sebelum trade
-- **Stability & Performance Fixes (v3.0)**:
-    - **WebSocket Memory Leak Fix**: `_cleanup_pending_requests()` method untuk cleanup expired pending requests setiap 60 detik via health check
-    - **Thread Safety**: `is_connected` flag dijadikan thread-safe dengan `_is_connected_lock` dan property getter/setter
-    - **Martingale Balance Guard**: Balance check dipindahkan SEBELUM calculate martingale stake untuk prevent over-betting
-    - **CSV Data Durability**: Tambah `os.fsync()` sebelum atomic rename untuk memastikan data tersimpan ke disk
-    - **O(1) Indicator Calculation**: `calculate_ema_incremental()` dan `calculate_macd_incremental()` dengan caching (sebelumnya O(n²))
-    - **PairScanner Pruning**: `_prune_old_data()` untuk cleanup strategy data setiap 10000 ticks per symbol
-    - **SESSION_SECRET Persistence**: Session key disimpan ke file `.session_secret` jika tidak ada di environment (dilindungi .gitignore)
-- **Telegram WebApp Dashboard Integration (v3.1)**:
-    - **Auto-Authentication**: Ketika user membuka dashboard dari Telegram WebApp, otomatis login menggunakan Telegram ID (tidak perlu input token manual)
-    - **HMAC-SHA256 Validation**: initData dari Telegram divalidasi menggunakan HMAC-SHA256 dengan bot token untuk keamanan
-    - **Auth Date Expiry**: initData hanya valid 5 menit untuk mencegah replay attack
-    - **Per-User Token**: Setiap user mendapat token unik berdasarkan Telegram ID
-    - **Welcome Message**: Dashboard menampilkan "Welcome, {first_name}!" untuk user yang login via Telegram
-    - **Fallback Manual Token**: Jika tidak dari Telegram WebApp, user masih bisa login dengan token manual
-    - **Sinkronisasi Bot & Dashboard**: Dashboard tersinkron dengan bot - user yang sama di Telegram dan dashboard
-- **Multi-Strategy System (v3.4)**:
-    - **Strategy Selection**: Command `/strategy <nama>` untuk memilih strategi trading
-    - **TrendFollowingStrategy**: Fokus pada trend strength (ADX) dan EMA alignment, confidence boost saat trend kuat, ideal untuk market trending
-    - **BollingerBandsStrategy**: Deteksi breakout dari Bollinger Bands dengan RSI/MACD confirmation, ideal untuk volatile market dengan clear breakout signals
-    - **SupportResistanceStrategy**: Local minima/maxima detection dengan bounce tolerance, ideal untuk range-bound market dengan clear S/R levels
-    - **Dynamic Stake Calculation**: Setiap strategi memiliki TP/SL distance yang optimal untuk karakteristik trading-nya
-    - **Backward Compatible**: Default tetap multi_indicator, user bisa switch strategi tanpa restart bot (harus stop trading dulu)
+The bot implements multiple trading strategies, including a **Multi-Indicator Strategy** with confluence scoring and advanced filters (Multi-Timeframe Trend Confirmation, EMA Slope, ADX, Volume, Price Action, Signal Cooldown). Other strategies include **LDP Analyzer**, **Tick Picker**, **Terminal** (Smart Analysis 80%), **DigitPad**, **AMT (Accumulator)**, and **Sniper**. New strategies like **Trend Following**, **Bollinger Bands Breakout**, and **Support & Resistance** have been introduced, each with dynamic stake calculation.
 
-### Feature Specifications (v3.4)
-- **Supported Symbols**: Volatility indices (R_100, R_75, R_50, R_25, R_10, 1HZ100V, 1HZ75V, 1HZ50V) for 5-10 ticks duration, and frxXAUUSD (Gold/USD) for daily duration.
-- **Telegram Integration**: Provides interactive commands like `/start`, `/akun`, `/autotrade`, `/stop`, `/status`, `/strategy`, `/reset_balance`, and `/help`.
-- **Session Management**: Configurable target number of trades with auto-stop functionality.
-- **Multi-Strategy Support (Baru v3.4)**:
-  1. **Multi-Indicator Strategy** (Default) - RSI, EMA, MACD, Stochastic, ADX dengan multi-factor confluence scoring
-  2. **Trend Following Strategy** - Mengikuti trend jangka panjang menggunakan EMA Crossover & ADX Strength confirmation
-  3. **Bollinger Bands Breakout Strategy** - Trading saat harga breakout dari Bollinger Bands dengan RSI/MACD confirmation
-  4. **Support & Resistance Strategy** - Bounce & breakout di level support/resistance penting dengan local minima/maxima detection
+An **Adaptive Martingale System** dynamically adjusts multipliers based on the rolling win rate and has a maximum of 5 levels. **Risk Management** includes max session loss (20%), max consecutive losses (5x), daily loss limit ($50 USD for real accounts), balance checks, and auto-adjusting stake. **Session Analytics** track key performance indicators.
+
+Key features also include **Instant Data Preload** from the Deriv API, robust **Error Handling & Stability** with WebSocket reconnection and graceful shutdown, and **Multi-Account Support** (Demo/Real). **Per-User Token Authentication** encrypts and stores tokens securely, with **Telegram WebApp Dashboard Integration** providing auto-authentication and HMAC-SHA256 validation. **Martingale Recovery Priority** ensures stake preservation during recovery sequences, and **User Stake Priority** allows direct user control over stake amounts without automatic caps. The **Tick Direction Predictor** uses a multi-factor weighted analysis for predicting future tick movements. Stability and performance improvements include WebSocket memory leak fixes, thread safety, and efficient indicator calculations.
+
+**Real-time Strategy Panel Updates**: The dashboard now receives instant SignalEvent broadcasts when strategies are switched via Telegram, even when trading is inactive. The `_broadcast_strategy_change()` method in trading.py publishes STRATEGY_CHANGE events with strategy-specific data (ldp_data, terminal_data, digitpad_data, amt_data, sniper_data, multi_indicator_data) so panels update immediately.
+
+### Feature Specifications
+The bot supports **Volatility indices** (R_100, R_75, R_50, R_25, R_10, 1HZ100V, 1HZ75V, 1HZ50V) for 5-10 tick durations and **frxXAUUSD** (Gold/USD) for daily durations. **Telegram Integration** provides interactive commands for control and status. **Session Management** includes configurable target trades and auto-stop. The **Multi-Strategy System** allows selection from:
+1.  **Multi-Indicator Strategy** (Default)
+2.  **Trend Following Strategy**
+3.  **Bollinger Bands Breakout Strategy**
+4.  **Support & Resistance Strategy**
 
 ### System Design Choices
-- **File Structure**: Modular Python files for entry point (`main.py`), strategy (`strategy.py`), WebSocket communication (`deriv_ws.py`), trading logic (`trading.py`), symbol configuration (`symbols.py`), pair scanner (`pair_scanner.py`), dan user authentication (`user_auth.py`).
-- **Logging**: Dedicated `logs/` directory for trade journals, session summaries, analytics, and error logs.
-- **Security**: Deriv API tokens and Telegram bot tokens are stored as encrypted environment variables (Replit Secrets). WebSocket communication uses WSS for encryption.
-- **Startup (v2.8)**: Bot starts dengan async pattern dan delete_webhook untuk menghindari Telegram polling conflict. Tidak memerlukan Flask keep-alive server.
-
-## Deployment (Koyeb - Free Tier 24/7)
-- **Platform**: Koyeb dengan Docker
-- **Instance**: eco-small (FREE - 512MB RAM)
-- **Type**: Worker (bukan Web)
-- **Files**: `Dockerfile`, `requirements.txt`, `koyeb.yaml`, `.dockerignore`
-- **Guide**: Lihat `DEPLOY_KOYEB.md` untuk langkah lengkap
-- **Secrets yang dibutuhkan**:
-    - `TELEGRAM_BOT_TOKEN`: Token bot Telegram
-    - `DERIV_APP_ID`: App ID dari Deriv
-    - `SESSION_SECRET`: Random string untuk enkripsi
+The project utilizes a modular **file structure** for maintainability. **Logging** is comprehensive, with dedicated directories for trade journals, analytics, and error logs. **Security** is maintained through encrypted environment variables (Replit Secrets) for API and bot tokens, and WSS for WebSocket communication. The bot employs an asynchronous **startup** pattern, avoiding the need for a Flask keep-alive server.
 
 ## External Dependencies
-- `python-telegram-bot`: For Telegram API interaction and bot functionality.
-- `websocket-client`: For real-time WebSocket communication with the Deriv API.
-- `python-dotenv`: For managing environment variables, although Replit Secrets are primarily used.
-- `cryptography`: For encrypting user tokens securely (Fernet/AES-128).
+-   `python-telegram-bot`: For Telegram API interaction.
+-   `websocket-client`: For WebSocket communication with the Deriv API.
+-   `python-dotenv`: For managing environment variables (though Replit Secrets are primary).
+-   `cryptography`: For secure encryption of user tokens.
