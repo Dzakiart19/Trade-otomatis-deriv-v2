@@ -655,6 +655,18 @@ class TradingDashboard {
                 if (data.multi_indicator_data) {
                     this.updateMultiIndicatorPanel(data.multi_indicator_data);
                 }
+                if (data.terminal_data) {
+                    this.updateTerminalPanel(data.terminal_data);
+                }
+                if (data.digitpad_data) {
+                    this.updateDigitPadPanel(data.digitpad_data);
+                }
+                if (data.amt_data) {
+                    this.updateAMTPanel(data.amt_data);
+                }
+                if (data.sniper_data) {
+                    this.updateSniperPanel(data.sniper_data);
+                }
                 break;
         }
     }
@@ -665,28 +677,291 @@ class TradingDashboard {
         
         const strategyNameEl = document.getElementById('current-strategy');
         if (strategyNameEl) {
-            strategyNameEl.textContent = strategyMode;
+            const displayName = strategyMode.replace('_', ' ').toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            strategyNameEl.textContent = displayName;
         }
         
-        const ldpPanel = document.getElementById('ldp-panel');
-        const tickAnalyzerPanel = document.getElementById('tick-analyzer-panel');
-        const multiIndicatorPanel = document.getElementById('multi-indicator-panel');
+        const panels = {
+            ldp: document.getElementById('ldp-panel'),
+            tick_analyzer: document.getElementById('tick-analyzer-panel'),
+            terminal: document.getElementById('terminal-panel'),
+            digitpad: document.getElementById('digitpad-panel'),
+            amt: document.getElementById('amt-panel'),
+            sniper: document.getElementById('sniper-panel'),
+            multi_indicator: document.getElementById('multi-indicator-panel')
+        };
         
-        if (ldpPanel) ldpPanel.style.display = 'none';
-        if (tickAnalyzerPanel) tickAnalyzerPanel.style.display = 'none';
-        if (multiIndicatorPanel) multiIndicatorPanel.style.display = 'none';
+        const tickPickerGeneric = document.getElementById('tick-picker-generic-panel');
         
-        switch (strategyMode) {
-            case 'LDP':
-                if (ldpPanel) ldpPanel.style.display = 'block';
+        Object.values(panels).forEach(panel => {
+            if (panel) panel.style.display = 'none';
+        });
+        
+        const modeKey = strategyMode.toLowerCase();
+        
+        switch (modeKey) {
+            case 'ldp':
+                if (panels.ldp) panels.ldp.style.display = 'block';
+                if (tickPickerGeneric) tickPickerGeneric.style.display = 'none';
                 break;
-            case 'TICK_ANALYZER':
-                if (tickAnalyzerPanel) tickAnalyzerPanel.style.display = 'block';
+            case 'tick_analyzer':
+                if (panels.tick_analyzer) panels.tick_analyzer.style.display = 'block';
+                if (tickPickerGeneric) tickPickerGeneric.style.display = 'block';
                 break;
-            case 'MULTI_INDICATOR':
+            case 'terminal':
+                if (panels.terminal) panels.terminal.style.display = 'block';
+                if (tickPickerGeneric) tickPickerGeneric.style.display = 'none';
+                break;
+            case 'digitpad':
+                if (panels.digitpad) panels.digitpad.style.display = 'block';
+                if (tickPickerGeneric) tickPickerGeneric.style.display = 'none';
+                break;
+            case 'amt':
+                if (panels.amt) panels.amt.style.display = 'block';
+                if (tickPickerGeneric) tickPickerGeneric.style.display = 'none';
+                break;
+            case 'sniper':
+                if (panels.sniper) panels.sniper.style.display = 'block';
+                if (tickPickerGeneric) tickPickerGeneric.style.display = 'none';
+                break;
+            case 'multi_indicator':
             default:
-                if (multiIndicatorPanel) multiIndicatorPanel.style.display = 'block';
+                if (panels.multi_indicator) panels.multi_indicator.style.display = 'block';
+                if (tickPickerGeneric) tickPickerGeneric.style.display = 'block';
                 break;
+        }
+    }
+    
+    updateTerminalPanel(data) {
+        if (!data) return;
+        
+        if (data.probability !== undefined) {
+            const probEl = document.getElementById('terminal-probability');
+            if (probEl) {
+                probEl.textContent = `${(data.probability * 100).toFixed(0)}%`;
+                probEl.classList.remove('bullish', 'bearish');
+                if (data.probability >= 0.8) probEl.classList.add('bullish');
+            }
+        }
+        
+        if (data.direction) {
+            const dirEl = document.getElementById('terminal-direction');
+            if (dirEl) {
+                dirEl.textContent = data.direction.toUpperCase();
+                dirEl.classList.remove('bullish', 'bearish');
+                if (data.direction.toLowerCase() === 'call') dirEl.classList.add('bullish');
+                else if (data.direction.toLowerCase() === 'put') dirEl.classList.add('bearish');
+            }
+        }
+        
+        if (data.adx !== undefined) {
+            const adxEl = document.getElementById('terminal-adx');
+            if (adxEl) adxEl.textContent = data.adx.toFixed(1);
+        }
+        
+        const indicators = ['rsi', 'ema', 'macd', 'stoch'];
+        indicators.forEach(ind => {
+            if (data[ind] !== undefined) {
+                const fillEl = document.getElementById(`terminal-${ind}-fill`);
+                const signalEl = document.getElementById(`terminal-${ind}-signal`);
+                
+                if (fillEl) {
+                    const value = typeof data[ind] === 'object' ? data[ind].value : data[ind];
+                    fillEl.style.width = `${Math.min(100, Math.max(0, value))}%`;
+                }
+                
+                if (signalEl && data[ind + '_signal']) {
+                    signalEl.textContent = data[ind + '_signal'];
+                    signalEl.classList.remove('bullish', 'bearish', 'neutral');
+                    signalEl.classList.add(data[ind + '_signal'].toLowerCase());
+                }
+            }
+        });
+        
+        if (data.console_log) {
+            const consoleEl = document.getElementById('terminal-console');
+            if (consoleEl) {
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.textContent = data.console_log;
+                consoleEl.appendChild(line);
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+                
+                while (consoleEl.children.length > 20) {
+                    consoleEl.removeChild(consoleEl.firstChild);
+                }
+            }
+        }
+    }
+    
+    updateDigitPadPanel(data) {
+        if (!data) return;
+        
+        if (data.digit_frequencies) {
+            const frequencies = data.digit_frequencies;
+            const maxFreq = Math.max(...Object.values(frequencies));
+            const minFreq = Math.min(...Object.values(frequencies));
+            
+            for (let i = 0; i < 10; i++) {
+                const pctEl = document.getElementById(`dp-pct-${i}`);
+                const cell = document.querySelector(`.digitpad-cell[data-digit="${i}"]`);
+                const freq = frequencies[i] || 0;
+                
+                if (pctEl) pctEl.textContent = `${freq.toFixed(1)}%`;
+                
+                if (cell) {
+                    cell.classList.remove('hot', 'cold');
+                    if (freq >= maxFreq - 1) cell.classList.add('hot');
+                    else if (freq <= minFreq + 1) cell.classList.add('cold');
+                }
+            }
+        }
+        
+        if (data.even_percentage !== undefined) {
+            const evenPctEl = document.getElementById('dp-even-pct');
+            if (evenPctEl) evenPctEl.textContent = `${data.even_percentage.toFixed(1)}%`;
+        }
+        
+        if (data.odd_percentage !== undefined) {
+            const oddPctEl = document.getElementById('dp-odd-pct');
+            if (oddPctEl) oddPctEl.textContent = `${data.odd_percentage.toFixed(1)}%`;
+        }
+        
+        if (data.differ_percentage !== undefined) {
+            const differFill = document.getElementById('dp-differ-fill');
+            const differValue = document.getElementById('dp-differ-value');
+            if (differFill) differFill.style.width = `${data.differ_percentage}%`;
+            if (differValue) differValue.textContent = `${data.differ_percentage.toFixed(0)}%`;
+        }
+        
+        if (data.differ_min !== undefined) {
+            const minEl = document.getElementById('dp-differ-min');
+            if (minEl) minEl.textContent = `${data.differ_min.toFixed(0)}%`;
+        }
+        
+        if (data.differ_max !== undefined) {
+            const maxEl = document.getElementById('dp-differ-max');
+            if (maxEl) maxEl.textContent = `${data.differ_max.toFixed(0)}%`;
+        }
+        
+        if (data.signal_text) {
+            const signalIndicator = document.getElementById('dp-signal-indicator');
+            const signalText = signalIndicator?.querySelector('.dp-signal-text');
+            if (signalText) signalText.textContent = data.signal_text;
+            
+            if (signalIndicator) {
+                signalIndicator.classList.remove('strong-buy', 'strong-sell', 'not-good');
+                if (data.signal_type === 'strong_buy') signalIndicator.classList.add('strong-buy');
+                else if (data.signal_type === 'strong_sell') signalIndicator.classList.add('strong-sell');
+                else if (data.signal_type === 'not_good') signalIndicator.classList.add('not-good');
+            }
+        }
+    }
+    
+    updateAMTPanel(data) {
+        if (!data) return;
+        
+        if (data.growth_rate !== undefined) {
+            const growthEl = document.getElementById('amt-growth-rate');
+            if (growthEl) growthEl.textContent = `${data.growth_rate}%`;
+        }
+        
+        if (data.current_pnl !== undefined) {
+            const pnlEl = document.getElementById('amt-current-pnl');
+            if (pnlEl) {
+                const pnl = data.current_pnl;
+                pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+                pnlEl.classList.remove('positive', 'negative');
+                pnlEl.classList.add(pnl >= 0 ? 'positive' : 'negative');
+            }
+        }
+        
+        if (data.tick_count !== undefined) {
+            const tickEl = document.getElementById('amt-tick-count');
+            if (tickEl) tickEl.textContent = data.tick_count;
+        }
+        
+        if (data.take_profit !== undefined) {
+            const tpEl = document.getElementById('amt-tp-value');
+            if (tpEl) tpEl.textContent = `$${data.take_profit.toFixed(2)}`;
+        }
+        
+        if (data.stop_loss !== undefined) {
+            const slEl = document.getElementById('amt-sl-value');
+            if (slEl) slEl.textContent = `$${data.stop_loss.toFixed(2)}`;
+        }
+        
+        if (data.progress !== undefined) {
+            const progressFill = document.getElementById('amt-progress-fill');
+            const progressLabel = document.getElementById('amt-progress-label');
+            
+            if (progressFill) {
+                const width = Math.abs(data.progress) * 50;
+                progressFill.style.width = `${width}%`;
+                progressFill.style.left = data.progress >= 0 ? '50%' : `${50 - width}%`;
+                progressFill.style.background = data.progress >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            }
+            
+            if (progressLabel) progressLabel.textContent = `${(data.progress * 100).toFixed(0)}%`;
+        }
+        
+        if (data.status) {
+            const statusEl = document.getElementById('amt-status');
+            const statusText = statusEl?.querySelector('.amt-status-text');
+            if (statusText) statusText.textContent = data.status;
+        }
+    }
+    
+    updateSniperPanel(data) {
+        if (!data) return;
+        
+        if (data.signal) {
+            const signalEl = document.getElementById('sniper-signal');
+            if (signalEl) {
+                signalEl.textContent = data.signal.toUpperCase();
+                signalEl.classList.remove('bullish', 'bearish');
+                if (data.signal.toLowerCase() === 'buy' || data.signal.toLowerCase() === 'call') {
+                    signalEl.classList.add('bullish');
+                } else if (data.signal.toLowerCase() === 'sell' || data.signal.toLowerCase() === 'put') {
+                    signalEl.classList.add('bearish');
+                }
+            }
+        }
+        
+        if (data.winrate !== undefined) {
+            const winrateEl = document.getElementById('sniper-winrate');
+            if (winrateEl) winrateEl.textContent = `${data.winrate.toFixed(1)}%`;
+        }
+        
+        if (data.wins !== undefined && data.losses !== undefined) {
+            const sessionEl = document.getElementById('sniper-session');
+            if (sessionEl) sessionEl.textContent = `${data.wins}W / ${data.losses}L`;
+        }
+        
+        if (data.confidence !== undefined) {
+            const confidenceFill = document.getElementById('sniper-confidence-fill');
+            const confidenceValue = document.getElementById('sniper-confidence-value');
+            
+            if (confidenceFill) confidenceFill.style.width = `${data.confidence * 100}%`;
+            if (confidenceValue) confidenceValue.textContent = `${(data.confidence * 100).toFixed(0)}%`;
+        }
+        
+        if (data.console_log) {
+            const consoleEl = document.getElementById('sniper-console');
+            if (consoleEl) {
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.textContent = data.console_log;
+                consoleEl.appendChild(line);
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+                
+                while (consoleEl.children.length > 20) {
+                    consoleEl.removeChild(consoleEl.firstChild);
+                }
+            }
         }
     }
     

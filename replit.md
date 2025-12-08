@@ -25,6 +25,18 @@ Do not make changes to the file `Y`.
     - **Responsive Design**: Mobile-first approach with breakpoints at 768px and 480px
     - **Reusable Components**: Cards, buttons, badges, tables, forms, status indicators
     - **CSS Variables**: Centralized design tokens for easy theming and consistency
+- **Dynamic Strategy Panel System (v3.3)**:
+    - **Strategy-Specific UI Panels**: Each of the 7 trading strategies has unique UI components:
+        - **Multi-Indicator**: RSI gauge, MACD signal, trend indicator, confluence score
+        - **LDP**: Digit zones (Low/Mid/High), hot/cold digits, signal type display
+        - **Tick Analyzer**: Streak counter, momentum bar, pattern badges
+        - **Terminal**: Smart Analysis 80%, 4 indicator bars (RSI/EMA/MACD/Stoch), risk selector, console output
+        - **DigitPad**: 10-digit grid with frequency percentages, Even/Odd stats, signal chart
+        - **AMT**: Growth rate selector, Take Profit/Stop Loss display, P/L progress bar
+        - **Sniper**: Strategy selector, confidence meter, session stats, console output
+    - **Panel Switching**: updateStrategyPanel() dynamically shows/hides panels based on strategy_mode
+    - **Real-Time Updates**: Strategy-specific data flows from backend via SignalEvent to update panels
+    - **WebSocket Integration**: terminal_data, digitpad_data, amt_data, sniper_data fields in SignalEvent
 
 ### Technical Implementations
 - **Trading Strategies (v3.0)**:

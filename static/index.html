@@ -54,6 +54,11 @@
                             <span class="panel-title">LDP - Last Digit Prediction</span>
                             <span class="panel-badge ldp">DIGIT</span>
                         </div>
+                        <div class="ldp-contract-tabs">
+                            <button class="ldp-tab active" data-type="over_under">Over/Under</button>
+                            <button class="ldp-tab" data-type="diff_match">Diff/Match</button>
+                            <button class="ldp-tab" data-type="rise_fall">Rise/Fall</button>
+                        </div>
                         <div class="digit-heatmap" id="digit-heatmap">
                             <div class="digit-cell" data-digit="0"><span class="digit-num">0</span><span class="digit-freq">0%</span></div>
                             <div class="digit-cell" data-digit="1"><span class="digit-num">1</span><span class="digit-freq">0%</span></div>
@@ -96,7 +101,7 @@
 
                     <div class="strategy-panel tick-analyzer-panel" id="tick-analyzer-panel" style="display: none;">
                         <div class="panel-header">
-                            <span class="panel-title">Tick Analyzer</span>
+                            <span class="panel-title">Tick Picker</span>
                             <span class="panel-badge tick">TICK</span>
                         </div>
                         <div class="tick-analyzer-content">
@@ -106,6 +111,10 @@
                                     <span class="streak-count" id="streak-count">0</span>
                                     <span class="streak-label">STREAK</span>
                                 </div>
+                            </div>
+                            <div class="tick-buttons">
+                                <button class="tick-btn buy" id="tick-buy-btn">BUY</button>
+                                <button class="tick-btn sell" id="tick-sell-btn">SELL</button>
                             </div>
                             <div class="momentum-section">
                                 <span class="momentum-label">Momentum</span>
@@ -125,6 +134,269 @@
                                 <div class="pattern-badges" id="pattern-badges">
                                     <span class="pattern-badge none">No pattern</span>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="strategy-panel terminal-panel" id="terminal-panel" style="display: none;">
+                        <div class="panel-header">
+                            <span class="panel-title">Terminal - Smart Analysis</span>
+                            <span class="panel-badge terminal">80%</span>
+                        </div>
+                        <div class="terminal-content">
+                            <div class="terminal-stats-row">
+                                <div class="terminal-stat">
+                                    <span class="terminal-stat-label">Probability</span>
+                                    <span class="terminal-stat-value" id="terminal-probability">0%</span>
+                                </div>
+                                <div class="terminal-stat">
+                                    <span class="terminal-stat-label">Direction</span>
+                                    <span class="terminal-stat-value" id="terminal-direction">--</span>
+                                </div>
+                                <div class="terminal-stat">
+                                    <span class="terminal-stat-label">ADX</span>
+                                    <span class="terminal-stat-value" id="terminal-adx">0</span>
+                                </div>
+                            </div>
+                            <div class="terminal-indicators">
+                                <div class="terminal-indicator">
+                                    <span class="indicator-name">RSI</span>
+                                    <div class="indicator-bar">
+                                        <div class="indicator-fill" id="terminal-rsi-fill" style="width: 50%"></div>
+                                    </div>
+                                    <span class="indicator-signal neutral" id="terminal-rsi-signal">NEUTRAL</span>
+                                </div>
+                                <div class="terminal-indicator">
+                                    <span class="indicator-name">EMA</span>
+                                    <div class="indicator-bar">
+                                        <div class="indicator-fill" id="terminal-ema-fill" style="width: 50%"></div>
+                                    </div>
+                                    <span class="indicator-signal neutral" id="terminal-ema-signal">NEUTRAL</span>
+                                </div>
+                                <div class="terminal-indicator">
+                                    <span class="indicator-name">MACD</span>
+                                    <div class="indicator-bar">
+                                        <div class="indicator-fill" id="terminal-macd-fill" style="width: 50%"></div>
+                                    </div>
+                                    <span class="indicator-signal neutral" id="terminal-macd-signal">NEUTRAL</span>
+                                </div>
+                                <div class="terminal-indicator">
+                                    <span class="indicator-name">STOCH</span>
+                                    <div class="indicator-bar">
+                                        <div class="indicator-fill" id="terminal-stoch-fill" style="width: 50%"></div>
+                                    </div>
+                                    <span class="indicator-signal neutral" id="terminal-stoch-signal">NEUTRAL</span>
+                                </div>
+                            </div>
+                            <div class="terminal-risk-selector">
+                                <span class="risk-label">Risk Level:</span>
+                                <div class="risk-buttons">
+                                    <button class="risk-btn active" data-risk="low">Low (1.8x)</button>
+                                    <button class="risk-btn" data-risk="medium">Medium (2.1x)</button>
+                                    <button class="risk-btn" data-risk="high">High (2.5x)</button>
+                                    <button class="risk-btn" data-risk="very_high">Very High (5.1x)</button>
+                                </div>
+                            </div>
+                            <div class="terminal-mode-toggles">
+                                <div class="mode-toggle active" id="smart-analysis-toggle">
+                                    <span class="toggle-icon">🧠</span>
+                                    <span class="toggle-name">Smart Analysis</span>
+                                </div>
+                                <div class="mode-toggle" id="hybrid-recovery-toggle">
+                                    <span class="toggle-icon">🔄</span>
+                                    <span class="toggle-name">Hybrid Recovery</span>
+                                </div>
+                            </div>
+                            <div class="terminal-console" id="terminal-console">
+                                <div class="console-line">Terminal ready - Smart Analysis 80%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="strategy-panel digitpad-panel" id="digitpad-panel" style="display: none;">
+                        <div class="panel-header">
+                            <span class="panel-title">DigitPad - Digit Prediction</span>
+                            <span class="panel-badge digitpad">0-9</span>
+                        </div>
+                        <div class="digitpad-content">
+                            <div class="digitpad-grid" id="digitpad-grid">
+                                <div class="digitpad-cell" data-digit="0">
+                                    <span class="dp-digit">0</span>
+                                    <span class="dp-pct" id="dp-pct-0">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="1">
+                                    <span class="dp-digit">1</span>
+                                    <span class="dp-pct" id="dp-pct-1">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="2">
+                                    <span class="dp-digit">2</span>
+                                    <span class="dp-pct" id="dp-pct-2">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="3">
+                                    <span class="dp-digit">3</span>
+                                    <span class="dp-pct" id="dp-pct-3">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="4">
+                                    <span class="dp-digit">4</span>
+                                    <span class="dp-pct" id="dp-pct-4">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="5">
+                                    <span class="dp-digit">5</span>
+                                    <span class="dp-pct" id="dp-pct-5">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="6">
+                                    <span class="dp-digit">6</span>
+                                    <span class="dp-pct" id="dp-pct-6">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="7">
+                                    <span class="dp-digit">7</span>
+                                    <span class="dp-pct" id="dp-pct-7">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="8">
+                                    <span class="dp-digit">8</span>
+                                    <span class="dp-pct" id="dp-pct-8">--</span>
+                                </div>
+                                <div class="digitpad-cell" data-digit="9">
+                                    <span class="dp-digit">9</span>
+                                    <span class="dp-pct" id="dp-pct-9">--</span>
+                                </div>
+                            </div>
+                            <div class="digitpad-even-odd">
+                                <div class="eo-cell even" data-type="even">
+                                    <span class="eo-label">Even</span>
+                                    <span class="eo-pct" id="dp-even-pct">--</span>
+                                </div>
+                                <div class="eo-cell odd" data-type="odd">
+                                    <span class="eo-label">ODD</span>
+                                    <span class="eo-pct" id="dp-odd-pct">--</span>
+                                </div>
+                            </div>
+                            <div class="digitpad-signals">
+                                <div class="signal-chart-header">
+                                    <span class="signal-chart-title">Signals Chart</span>
+                                </div>
+                                <div class="signal-bars">
+                                    <div class="signal-bar-row">
+                                        <span class="signal-label">Differ</span>
+                                        <div class="signal-bar-container">
+                                            <div class="signal-bar-fill" id="dp-differ-fill" style="width: 50%"></div>
+                                        </div>
+                                        <span class="signal-value" id="dp-differ-value">50%</span>
+                                    </div>
+                                    <div class="signal-bar-row">
+                                        <span class="signal-label">Min</span>
+                                        <span class="signal-value" id="dp-differ-min">30%</span>
+                                    </div>
+                                    <div class="signal-bar-row">
+                                        <span class="signal-label">Max</span>
+                                        <span class="signal-value" id="dp-differ-max">70%</span>
+                                    </div>
+                                </div>
+                                <div class="digitpad-signal-indicator" id="dp-signal-indicator">
+                                    <span class="dp-signal-text">Natural</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="strategy-panel amt-panel" id="amt-panel" style="display: none;">
+                        <div class="panel-header">
+                            <span class="panel-title">AMT - Accumulator</span>
+                            <span class="panel-badge amt">ACC</span>
+                        </div>
+                        <div class="amt-content">
+                            <div class="amt-stats-row">
+                                <div class="amt-stat">
+                                    <span class="amt-stat-label">Growth Rate</span>
+                                    <span class="amt-stat-value" id="amt-growth-rate">1%</span>
+                                </div>
+                                <div class="amt-stat">
+                                    <span class="amt-stat-label">Current P/L</span>
+                                    <span class="amt-stat-value" id="amt-current-pnl">$0.00</span>
+                                </div>
+                                <div class="amt-stat">
+                                    <span class="amt-stat-label">Tick Count</span>
+                                    <span class="amt-stat-value" id="amt-tick-count">0</span>
+                                </div>
+                            </div>
+                            <div class="amt-growth-selector">
+                                <span class="growth-label">Growth Rate:</span>
+                                <div class="growth-buttons">
+                                    <button class="growth-btn active" data-rate="1">1%</button>
+                                    <button class="growth-btn" data-rate="2">2%</button>
+                                    <button class="growth-btn" data-rate="3">3%</button>
+                                    <button class="growth-btn" data-rate="4">4%</button>
+                                    <button class="growth-btn" data-rate="5">5%</button>
+                                </div>
+                            </div>
+                            <div class="amt-direction">
+                                <button class="amt-dir-btn call active" id="amt-call-btn">CALL ↑</button>
+                                <button class="amt-dir-btn put" id="amt-put-btn">PUT ↓</button>
+                            </div>
+                            <div class="amt-tpsl">
+                                <div class="tpsl-item">
+                                    <span class="tpsl-label">Take Profit at:</span>
+                                    <span class="tpsl-value" id="amt-tp-value">$0.00</span>
+                                </div>
+                                <div class="tpsl-item">
+                                    <span class="tpsl-label">Stop Loss:</span>
+                                    <span class="tpsl-value" id="amt-sl-value">$0.00</span>
+                                </div>
+                            </div>
+                            <div class="amt-progress">
+                                <div class="amt-progress-bar">
+                                    <div class="amt-progress-fill" id="amt-progress-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="amt-progress-labels">
+                                    <span class="loss-label">SL</span>
+                                    <span class="current-label" id="amt-progress-label">0%</span>
+                                    <span class="profit-label">TP</span>
+                                </div>
+                            </div>
+                            <div class="amt-status" id="amt-status">
+                                <span class="amt-status-text">Ready to trade</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="strategy-panel sniper-panel" id="sniper-panel" style="display: none;">
+                        <div class="panel-header">
+                            <span class="panel-title">Sniper - High Probability</span>
+                            <span class="panel-badge sniper">SNIPE</span>
+                        </div>
+                        <div class="sniper-content">
+                            <div class="sniper-stats-row">
+                                <div class="sniper-stat">
+                                    <span class="sniper-stat-label">Signal</span>
+                                    <span class="sniper-stat-value" id="sniper-signal">WAIT</span>
+                                </div>
+                                <div class="sniper-stat">
+                                    <span class="sniper-stat-label">Win Rate</span>
+                                    <span class="sniper-stat-value" id="sniper-winrate">0%</span>
+                                </div>
+                                <div class="sniper-stat">
+                                    <span class="sniper-stat-label">Session</span>
+                                    <span class="sniper-stat-value" id="sniper-session">0W / 0L</span>
+                                </div>
+                            </div>
+                            <div class="sniper-strategy-selector">
+                                <span class="strategy-select-label">Strategy:</span>
+                                <div class="sniper-strategies">
+                                    <button class="sniper-strat-btn active" data-strat="confluence">Confluence</button>
+                                    <button class="sniper-strat-btn" data-strat="reversal">Reversal</button>
+                                    <button class="sniper-strat-btn" data-strat="momentum">Momentum</button>
+                                    <button class="sniper-strat-btn" data-strat="breakout">Breakout</button>
+                                </div>
+                            </div>
+                            <div class="sniper-confidence">
+                                <span class="confidence-label">Confidence Level</span>
+                                <div class="confidence-meter">
+                                    <div class="confidence-fill" id="sniper-confidence-fill" style="width: 0%"></div>
+                                </div>
+                                <span class="confidence-value" id="sniper-confidence-value">0%</span>
+                            </div>
+                            <div class="sniper-console" id="sniper-console">
+                                <div class="console-line">Sniper ready - High probability entry mode</div>
                             </div>
                         </div>
                     </div>
@@ -178,7 +450,7 @@
                     </div>
                 </div>
 
-                <div class="tick-picker-panel">
+                <div class="tick-picker-panel" id="tick-picker-generic-panel">
                     <div class="tick-picker-header">
                         <span class="tick-picker-title">Tick Picker</span>
                         <span class="window-size" id="tick-window-size">Window: 50 ticks</span>

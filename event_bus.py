@@ -223,6 +223,10 @@ class SignalEvent:
     strategy_mode: str = "multi_indicator"  # Active strategy mode
     ldp_data: Optional[dict] = None  # LDP strategy data (digit_stats, hot_digits, cold_digits, zones)
     tick_analyzer_data: Optional[dict] = None  # Tick analyzer data (streak, momentum, pattern)
+    terminal_data: Optional[dict] = None  # Terminal strategy data (probability, direction, indicators)
+    digitpad_data: Optional[dict] = None  # DigitPad strategy data (digit frequencies, even/odd, signals)
+    amt_data: Optional[dict] = None  # AMT/Accumulator strategy data (growth rate, TP/SL, progress)
+    sniper_data: Optional[dict] = None  # Sniper strategy data (signal, confidence, session stats)
     timestamp: datetime = field(default_factory=datetime.now)
     
     def to_dict(self) -> dict:
@@ -246,6 +250,14 @@ class SignalEvent:
             result["ldp_data"] = self.ldp_data
         if self.tick_analyzer_data:
             result["tick_analyzer_data"] = self.tick_analyzer_data
+        if self.terminal_data:
+            result["terminal_data"] = self.terminal_data
+        if self.digitpad_data:
+            result["digitpad_data"] = self.digitpad_data
+        if self.amt_data:
+            result["amt_data"] = self.amt_data
+        if self.sniper_data:
+            result["sniper_data"] = self.sniper_data
         return result
 
 

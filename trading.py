@@ -1671,7 +1671,8 @@ class TradingManager:
             Tuple of (signal: Signal, confidence: float, reason: str, 
                      trend_direction: str, tick_count: int, last_price: float,
                      rsi_value: float, adx_value: float, tick_picker_data: dict,
-                     ldp_data: dict, tick_analyzer_data: dict)
+                     ldp_data: dict, tick_analyzer_data: dict, terminal_data: dict,
+                     digitpad_data: dict, amt_data: dict, sniper_data: dict)
         """
         # Default values
         signal = Signal.WAIT
@@ -1685,6 +1686,10 @@ class TradingManager:
         tick_picker_data = None
         ldp_data = None
         tick_analyzer_data = None
+        terminal_data = None
+        digitpad_data = None
+        amt_data = None
+        sniper_data = None
         
         if self.strategy_mode == StrategyMode.MULTI_INDICATOR:
             # Use Multi-Indicator strategy (default)
@@ -1807,9 +1812,26 @@ class TradingManager:
                 tick_count = stats.get('tick_count', 0)
                 last_price = list(self.terminal_strategy.tick_history)[-1] if self.terminal_strategy.tick_history else 0.0
                 
+                # Build terminal_data for dashboard
+                terminal_data = {
+                    "probability": stats.get('win_probability', 0.5),
+                    "direction": terminal_signal.direction.value if terminal_signal else "WAIT",
+                    "adx": stats.get('adx_value', 0.0),
+                    "rsi": stats.get('rsi_value', 50.0),
+                    "rsi_signal": "bullish" if stats.get('rsi_value', 50) < 30 else "bearish" if stats.get('rsi_value', 50) > 70 else "neutral",
+                    "ema": stats.get('ema_value', 0.0),
+                    "ema_signal": "bullish" if stats.get('trend_direction') == 'UP' else "bearish" if stats.get('trend_direction') == 'DOWN' else "neutral",
+                    "macd": stats.get('macd_value', 0.0),
+                    "macd_signal": stats.get('macd_signal', 'neutral').lower(),
+                    "stoch": stats.get('stochastic_k', 50.0),
+                    "stoch_signal": "bullish" if stats.get('stochastic_k', 50) < 20 else "bearish" if stats.get('stochastic_k', 50) > 80 else "neutral",
+                    "console_log": f"[{tick_count}] {reason}" if tick_count > 0 else None
+                }
+                
                 if terminal_signal:
                     confidence = terminal_signal.confidence
                     reason = terminal_signal.reason
+                    terminal_data["probability"] = confidence
                     
                     # Convert Terminal signal direction to unified Signal
                     if terminal_signal.direction == TerminalSignalDirection.CALL:
@@ -1835,9 +1857,35 @@ class TradingManager:
                 tick_count = stats.get('total_ticks', 0)
                 last_price = stats.get('current_price', 0.0)
                 
+                # Calculate PnL progress for AMT
+                current_pnl = self.stats.current_balance - self.stats.starting_balance if self.stats.starting_balance > 0 else 0.0
+                take_profit = self.take_profit_pct * self.stats.starting_balance / 100 if self.stats.starting_balance > 0 else 0.0
+                stop_loss = self.stop_loss_pct * self.stats.starting_balance / 100 if self.stats.starting_balance > 0 else 0.0
+                
+                # Progress: -1 to 1 (SL to TP)
+                progress = 0.0
+                if take_profit > 0 and stop_loss > 0:
+                    if current_pnl >= 0:
+                        progress = min(1.0, current_pnl / take_profit)
+                    else:
+                        progress = max(-1.0, current_pnl / stop_loss)
+                
+                # Build amt_data for dashboard
+                amt_data = {
+                    "growth_rate": stats.get('growth_rate', 1),
+                    "current_pnl": current_pnl,
+                    "tick_count": tick_count,
+                    "take_profit": take_profit,
+                    "stop_loss": stop_loss,
+                    "progress": progress,
+                    "status": "Accumulating" if signal == Signal.WAIT else "Signal Detected",
+                    "direction": acc_signal.direction.value if acc_signal else "NONE"
+                }
+                
                 if acc_signal:
                     confidence = acc_signal.confidence
                     reason = acc_signal.reason
+                    amt_data["status"] = f"Signal: {acc_signal.direction.value}"
                     
                     # Convert Accumulator signal direction to unified Signal
                     if acc_signal.direction == AccumulatorDirection.CALL:
@@ -1863,6 +1911,34 @@ class TradingManager:
                 tick_count = stats.get('tick_count', 0)
                 last_price = list(self.ldp_strategy.tick_history)[-1] if self.ldp_strategy.tick_history else 0.0
                 
+                # Get digit stats from LDP strategy
+                digit_stats = stats.get('digit_stats', {})
+                total_digits = sum(digit_stats.values()) if digit_stats else 1
+                
+                # Calculate digit frequencies
+                digit_frequencies = {}
+                for i in range(10):
+                    count = digit_stats.get(str(i), 0)
+                    digit_frequencies[i] = (count / total_digits * 100) if total_digits > 0 else 10.0
+                
+                # Calculate even/odd percentages
+                even_count = sum(digit_stats.get(str(i), 0) for i in [0, 2, 4, 6, 8])
+                odd_count = sum(digit_stats.get(str(i), 0) for i in [1, 3, 5, 7, 9])
+                even_pct = (even_count / total_digits * 100) if total_digits > 0 else 50.0
+                odd_pct = (odd_count / total_digits * 100) if total_digits > 0 else 50.0
+                
+                # Build digitpad_data for dashboard
+                digitpad_data = {
+                    "digit_frequencies": digit_frequencies,
+                    "even_percentage": even_pct,
+                    "odd_percentage": odd_pct,
+                    "differ_percentage": stats.get('differ_percentage', 50.0),
+                    "differ_min": stats.get('differ_min', 0.0),
+                    "differ_max": stats.get('differ_max', 100.0),
+                    "signal_text": "Analyzing...",
+                    "signal_type": "neutral"
+                }
+                
                 # Prepare LDP data for SignalEvent
                 ldp_data = {
                     "hot_digits": stats.get('hot_digits', []),
@@ -1875,6 +1951,17 @@ class TradingManager:
                 if best_signal:
                     confidence = best_signal.confidence
                     reason = best_signal.reason
+                    
+                    # Update digitpad signal info
+                    if confidence >= 0.75:
+                        digitpad_data["signal_type"] = "strong_buy" if best_signal.contract_type in [LDPContractType.DIGITEVEN, LDPContractType.DIGITMATCH] else "strong_sell"
+                        digitpad_data["signal_text"] = f"Strong: {best_signal.contract_type.value}"
+                    elif confidence >= 0.60:
+                        digitpad_data["signal_type"] = "neutral"
+                        digitpad_data["signal_text"] = f"Signal: {best_signal.contract_type.value}"
+                    else:
+                        digitpad_data["signal_type"] = "not_good"
+                        digitpad_data["signal_text"] = "Low confidence"
                     
                     # Convert LDP signal to unified Signal for DigitPad
                     if best_signal.contract_type in [LDPContractType.DIGITOVER, LDPContractType.DIGITEVEN, LDPContractType.DIGITMATCH]:
@@ -1894,6 +1981,7 @@ class TradingManager:
                 else:
                     signal = Signal.WAIT
                     reason = "DigitPad: Menunggu pattern digit yang optimal..."
+                    digitpad_data["signal_text"] = "Waiting for pattern..."
         
         elif self.strategy_mode == StrategyMode.SNIPER:
             # Use Terminal Strategy with Sniper filter for highest probability
@@ -1903,17 +1991,37 @@ class TradingManager:
                 tick_count = stats.get('tick_count', 0)
                 last_price = list(self.terminal_strategy.tick_history)[-1] if self.terminal_strategy.tick_history else 0.0
                 
+                # Calculate sniper session stats
+                total_trades = self.stats.total_trades
+                winrate = (self.stats.wins / total_trades * 100) if total_trades > 0 else 0.0
+                
+                # Build sniper_data for dashboard
+                sniper_data = {
+                    "signal": "WAIT",
+                    "winrate": winrate,
+                    "wins": self.stats.wins,
+                    "losses": self.stats.losses,
+                    "confidence": terminal_signal.confidence if terminal_signal else 0.0,
+                    "console_log": None
+                }
+                
                 if terminal_signal and terminal_signal.confidence >= 0.85:
                     confidence = terminal_signal.confidence
                     reason = f"Sniper: {terminal_signal.reason}"
+                    
+                    # Update sniper data
+                    sniper_data["confidence"] = confidence
+                    sniper_data["console_log"] = f"[Tick {tick_count}] HIGH PROB: {terminal_signal.direction.value} @ {confidence:.1%}"
                     
                     # Convert Terminal signal direction to unified Signal
                     if terminal_signal.direction == TerminalSignalDirection.CALL:
                         signal = Signal.BUY
                         trend_direction = "UP"
+                        sniper_data["signal"] = "CALL"
                     elif terminal_signal.direction == TerminalSignalDirection.PUT:
                         signal = Signal.SELL
                         trend_direction = "DOWN"
+                        sniper_data["signal"] = "PUT"
                     else:
                         signal = Signal.WAIT
                         trend_direction = "SIDEWAYS"
@@ -1923,11 +2031,14 @@ class TradingManager:
                     signal = Signal.WAIT
                     if terminal_signal:
                         reason = f"Sniper: Confidence {terminal_signal.confidence:.1%} < 85% threshold"
+                        sniper_data["console_log"] = f"[Tick {tick_count}] Waiting... ({terminal_signal.confidence:.1%} < 85%)"
                     else:
                         reason = "Sniper: Menunggu high probability entry..."
+                        sniper_data["console_log"] = f"[Tick {tick_count}] Scanning for entry..."
         
         return (signal, confidence, reason, trend_direction, tick_count, last_price,
-                rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data)
+                rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data,
+                terminal_data, digitpad_data, amt_data, sniper_data)
     
     def _check_and_execute_signal(self):
         """
@@ -1972,7 +2083,8 @@ class TradingManager:
             
             # Get unified signal from active strategy (based on strategy_mode)
             (signal, confidence, reason, trend_direction, tick_count, last_price,
-             rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data) = self._get_unified_signal()
+             rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data,
+             terminal_data, digitpad_data, amt_data, sniper_data) = self._get_unified_signal()
             
             # Current strategy mode name
             strategy_mode_name = self.strategy_mode.value
@@ -1992,7 +2104,11 @@ class TradingManager:
                     tick_picker=tick_picker_data,
                     strategy_mode=strategy_mode_name,
                     ldp_data=ldp_data,
-                    tick_analyzer_data=tick_analyzer_data
+                    tick_analyzer_data=tick_analyzer_data,
+                    terminal_data=terminal_data,
+                    digitpad_data=digitpad_data,
+                    amt_data=amt_data,
+                    sniper_data=sniper_data
                 )
                 get_event_bus().publish("signal", signal_event)
                 return
@@ -2037,7 +2153,11 @@ class TradingManager:
                         tick_picker=tick_picker_data,
                         strategy_mode=strategy_mode_name,
                         ldp_data=ldp_data,
-                        tick_analyzer_data=tick_analyzer_data
+                        tick_analyzer_data=tick_analyzer_data,
+                        terminal_data=terminal_data,
+                        digitpad_data=digitpad_data,
+                        amt_data=amt_data,
+                        sniper_data=sniper_data
                     )
                     get_event_bus().publish("signal", signal_event)
                     return
@@ -2066,7 +2186,11 @@ class TradingManager:
                 tick_picker=tick_picker_data,
                 strategy_mode=strategy_mode_name,
                 ldp_data=ldp_data,
-                tick_analyzer_data=tick_analyzer_data
+                tick_analyzer_data=tick_analyzer_data,
+                terminal_data=terminal_data,
+                digitpad_data=digitpad_data,
+                amt_data=amt_data,
+                sniper_data=sniper_data
             )
             get_event_bus().publish("signal", signal_event)
             
