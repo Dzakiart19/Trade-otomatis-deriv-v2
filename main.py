@@ -454,7 +454,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton(get_text("btn_status", lang), callback_data="menu_status"),
                 InlineKeyboardButton(get_text("btn_help", lang), callback_data="menu_help")
             ],
-            [InlineKeyboardButton("⚙️ Strategi", callback_data="menu_strategi")],
+            [InlineKeyboardButton("🎯 Pilih Strategi Trading", callback_data="menu_strategi")],
             [InlineKeyboardButton(get_text("btn_logout", lang), callback_data="confirm_logout")]
         ]
     else:
