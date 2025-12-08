@@ -227,6 +227,7 @@ class SignalEvent:
     digitpad_data: Optional[dict] = None  # DigitPad strategy data (digit frequencies, even/odd, signals)
     amt_data: Optional[dict] = None  # AMT/Accumulator strategy data (growth rate, TP/SL, progress)
     sniper_data: Optional[dict] = None  # Sniper strategy data (signal, confidence, session stats)
+    multi_indicator_data: Optional[dict] = None  # Multi-Indicator strategy data (rsi, trend, macd, confluence)
     timestamp: datetime = field(default_factory=datetime.now)
     
     def to_dict(self) -> dict:
@@ -258,6 +259,8 @@ class SignalEvent:
             result["amt_data"] = self.amt_data
         if self.sniper_data:
             result["sniper_data"] = self.sniper_data
+        if self.multi_indicator_data:
+            result["multi_indicator_data"] = self.multi_indicator_data
         return result
 
 

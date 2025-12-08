@@ -461,43 +461,155 @@ class TradingManager:
         return self.MARTINGALE_MULTIPLIER
     
     def set_strategy_mode(self, mode: StrategyMode) -> str:
-        """Switch strategy mode"""
+        """Switch strategy mode and broadcast to dashboard"""
         self.strategy_mode = mode
+        result_msg = ""
         
         if mode == StrategyMode.LDP:
             self.ldp_strategy = LDPStrategy()
             self.entry_filter = create_high_probability_filter()
             logger.info("🎯 Strategy mode set to LDP (Last Digit Prediction)")
-            return "Strategi diubah ke LDP (Last Digit Prediction)\n\n📝 Over/Under, Match/Differ, Rise/Fall berdasarkan digit terakhir"
+            result_msg = "Strategi diubah ke LDP (Last Digit Prediction)\n\n📝 Over/Under, Match/Differ, Rise/Fall berdasarkan digit terakhir"
         elif mode == StrategyMode.TICK_ANALYZER:
             self.tick_analyzer = TickTrendAnalyzer()
             self.entry_filter = create_high_probability_filter()
             logger.info("📈 Strategy mode set to Tick Analyzer")
-            return "Strategi diubah ke Tick Analyzer\n\n📝 Analisis trend tick untuk BUY/SELL"
+            result_msg = "Strategi diubah ke Tick Analyzer\n\n📝 Analisis trend tick untuk BUY/SELL"
         elif mode == StrategyMode.TERMINAL:
             self.terminal_strategy = TerminalStrategy()
             self.entry_filter = create_high_probability_filter()
             logger.info("🖥️ Strategy mode set to Terminal (Smart Analysis)")
-            return "Strategi diubah ke Terminal\n\n📝 Smart Analysis 80% + Hybrid Recovery dengan 4 level risiko"
+            result_msg = "Strategi diubah ke Terminal\n\n📝 Smart Analysis 80% + Hybrid Recovery dengan 4 level risiko"
         elif mode == StrategyMode.DIGITPAD:
             self.ldp_strategy = LDPStrategy()
             self.entry_filter = create_high_probability_filter()
             logger.info("🔢 Strategy mode set to DigitPad")
-            return "Strategi diubah ke DigitPad\n\n📝 Prediksi digit 0-9, Even/Odd dengan signals chart"
+            result_msg = "Strategi diubah ke DigitPad\n\n📝 Prediksi digit 0-9, Even/Odd dengan signals chart"
         elif mode == StrategyMode.AMT:
             self.accumulator_strategy = AccumulatorStrategy()
             self.entry_filter = create_high_probability_filter()
             logger.info("📈 Strategy mode set to AMT (Accumulator)")
-            return "Strategi diubah ke AMT (Accumulator)\n\n📝 Trading accumulator dengan Take Profit/Stop Loss"
+            result_msg = "Strategi diubah ke AMT (Accumulator)\n\n📝 Trading accumulator dengan Take Profit/Stop Loss"
         elif mode == StrategyMode.SNIPER:
             self.terminal_strategy = TerminalStrategy()
             self.entry_filter = create_sniper_filter()
             logger.info("🎯 Strategy mode set to Sniper")
-            return "Strategi diubah ke Sniper\n\n📝 High probability entry dengan strategy selector"
+            result_msg = "Strategi diubah ke Sniper\n\n📝 High probability entry dengan strategy selector"
         else:
             self.entry_filter = create_high_probability_filter()
             logger.info("📊 Strategy mode set to Multi-Indicator (default)")
-            return "Strategi diubah ke Multi-Indicator (default)\n\n📝 RSI + EMA + MACD + Trend Analysis"
+            result_msg = "Strategi diubah ke Multi-Indicator (default)\n\n📝 RSI + EMA + MACD + Trend Analysis"
+        
+        self._broadcast_strategy_change()
+        return result_msg
+    
+    def _broadcast_strategy_change(self):
+        """Broadcast strategy change to dashboard via SignalEvent"""
+        try:
+            strategy_mode_name = self.strategy_mode.value
+            current_symbol = self.symbol if self.symbol else DEFAULT_SYMBOL
+            
+            terminal_data = None
+            digitpad_data = None
+            amt_data = None
+            sniper_data = None
+            ldp_data = None
+            tick_analyzer_data = None
+            multi_indicator_data = None
+            
+            if self.strategy_mode == StrategyMode.TERMINAL:
+                terminal_data = {
+                    "probability": 0.0,
+                    "direction": "--",
+                    "adx": 0.0,
+                    "rsi": 50.0,
+                    "rsi_signal": "NEUTRAL",
+                    "ema": 50.0,
+                    "ema_signal": "NEUTRAL",
+                    "macd": 50.0,
+                    "macd_signal": "NEUTRAL",
+                    "stoch": 50.0,
+                    "stoch_signal": "NEUTRAL",
+                    "console_log": f"Strategy switched to Terminal - Smart Analysis 80%"
+                }
+            elif self.strategy_mode == StrategyMode.DIGITPAD:
+                digitpad_data = {
+                    "digit_frequencies": {str(i): 10.0 for i in range(10)},
+                    "even_percentage": 50.0,
+                    "odd_percentage": 50.0,
+                    "differ_percentage": 50.0,
+                    "differ_min": 30.0,
+                    "differ_max": 70.0,
+                    "signal_text": "Waiting for data...",
+                    "signal_type": "neutral"
+                }
+            elif self.strategy_mode == StrategyMode.AMT:
+                amt_data = {
+                    "growth_rate": 1,
+                    "current_pnl": 0.0,
+                    "tick_count": 0,
+                    "take_profit": 0.0,
+                    "stop_loss": 0.0,
+                    "progress": 0.0,
+                    "status": "Strategy switched to AMT - Accumulator"
+                }
+            elif self.strategy_mode == StrategyMode.SNIPER:
+                sniper_data = {
+                    "signal": "WAIT",
+                    "winrate": 0.0,
+                    "wins": 0,
+                    "losses": 0,
+                    "confidence": 0.0,
+                    "console_log": "Strategy switched to Sniper - High Probability Entry"
+                }
+            elif self.strategy_mode == StrategyMode.LDP:
+                ldp_data = {
+                    "digit_frequencies": {str(i): 10.0 for i in range(10)},
+                    "hot_digits": [],
+                    "cold_digits": [],
+                    "zones": {"low": 50.0, "high": 50.0},
+                    "signal_type": "DIGITOVER",
+                    "signal_digit": 5
+                }
+            elif self.strategy_mode == StrategyMode.TICK_ANALYZER:
+                tick_analyzer_data = {
+                    "streak": 0,
+                    "momentum": 0.0,
+                    "patterns": [],
+                    "up_ticks": 0,
+                    "down_ticks": 0
+                }
+            else:
+                multi_indicator_data = {
+                    "rsi": 50.0,
+                    "trend": "NEUTRAL",
+                    "macd": "NEUTRAL",
+                    "confluence": 0
+                }
+            
+            signal_event = SignalEvent(
+                signal_type="STRATEGY_CHANGE",
+                symbol=current_symbol,
+                confidence=0.0,
+                trend_direction="SIDEWAYS",
+                tick_count=0,
+                last_price=0.0,
+                reason=f"Strategy changed to {strategy_mode_name}",
+                strategy_mode=strategy_mode_name,
+                ldp_data=ldp_data,
+                tick_analyzer_data=tick_analyzer_data,
+                terminal_data=terminal_data,
+                digitpad_data=digitpad_data,
+                amt_data=amt_data,
+                sniper_data=sniper_data,
+                multi_indicator_data=multi_indicator_data
+            )
+            get_event_bus().publish("signal", signal_event)
+            logger.info(f"📡 Strategy change broadcasted to dashboard: {strategy_mode_name}")
+        except Exception as e:
+            logger.warning(f"Failed to broadcast strategy change: {e}")
+            import traceback
+            traceback.print_exc()
     
     def enable_hybrid_money_manager(self, balance: float, stake: float = 0.35) -> str:
         """Enable hybrid money manager for small capital"""
