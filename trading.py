@@ -359,6 +359,8 @@ class TradingManager:
         self.consecutive_losses: int = 0
         self.session_start_date: str = ""
         self.daily_loss: float = 0.0
+        self.take_profit_pct: float = 10.0  # Default 10% TP
+        self.stop_loss_pct: float = 5.0  # Default 5% SL
         
         # Session recovery tracking (Task 5)
         self.session_recovery_enabled: bool = self.SESSION_RECOVERY_ENABLED
