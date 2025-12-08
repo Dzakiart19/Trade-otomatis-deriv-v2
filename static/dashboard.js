@@ -619,6 +619,10 @@ class TradingDashboard {
         if (snapshot.status) {
             this.updateTradingStatus(snapshot.status);
         }
+        
+        if (snapshot.current_strategy) {
+            this.updateStrategyPanel(snapshot.current_strategy);
+        }
     }
     
     handleEvent(channel, data) {

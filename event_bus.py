@@ -314,6 +314,7 @@ class EventBus:
         self._current_balance: Optional[dict] = None
         self._current_status: Optional[dict] = None
         self._last_ticks: Dict[str, dict] = {}
+        self._current_strategy: str = "MULTI_INDICATOR"
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._loop_lock = threading.Lock()
@@ -509,6 +510,11 @@ class EventBus:
                 
             elif event_type == "status":
                 self._current_status = event_dict
+            
+            elif event_type == "signal":
+                strategy_mode = event_dict.get("strategy_mode")
+                if strategy_mode:
+                    self._current_strategy = strategy_mode
     
     def get_snapshot(self) -> dict:
         """
@@ -532,6 +538,7 @@ class EventBus:
                 "balance": self._current_balance,
                 "status": self._current_status,
                 "last_ticks": dict(self._last_ticks),
+                "current_strategy": self._current_strategy,
                 "snapshot_time": datetime.now().isoformat()
             }
     

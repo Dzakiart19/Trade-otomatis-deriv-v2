@@ -504,10 +504,27 @@ class TradingManager:
         return result_msg
     
     def _broadcast_strategy_change(self):
-        """Broadcast strategy change to dashboard via SignalEvent"""
+        """
+        Broadcast strategy change to dashboard via SignalEvent.
+        
+        This method creates a SignalEvent with the appropriate strategy-specific data
+        and publishes it to the EventBus. The dashboard receives this event to update
+        the UI based on the active strategy.
+        
+        Strategy data mapping:
+        - TERMINAL: terminal_data (probability, direction, indicators)
+        - DIGITPAD: digitpad_data (digit frequencies, even/odd percentages)
+        - AMT: amt_data (growth rate, TP/SL, progress)
+        - SNIPER: sniper_data (signal, winrate, confidence)
+        - LDP: ldp_data (digit frequencies, hot/cold digits, zones)
+        - TICK_ANALYZER: tick_analyzer_data (streak, momentum, patterns)
+        - MULTI_INDICATOR: multi_indicator_data (rsi, trend, macd, confluence)
+        """
         try:
             strategy_mode_name = self.strategy_mode.value
             current_symbol = self.symbol if self.symbol else DEFAULT_SYMBOL
+            
+            logger.info(f"🔄 Broadcasting strategy change: {strategy_mode_name} for symbol {current_symbol}")
             
             terminal_data = None
             digitpad_data = None
@@ -516,6 +533,7 @@ class TradingManager:
             ldp_data = None
             tick_analyzer_data = None
             multi_indicator_data = None
+            active_data_type = ""
             
             if self.strategy_mode == StrategyMode.TERMINAL:
                 terminal_data = {
@@ -532,6 +550,8 @@ class TradingManager:
                     "stoch_signal": "NEUTRAL",
                     "console_log": f"Strategy switched to Terminal - Smart Analysis 80%"
                 }
+                active_data_type = "terminal_data"
+                logger.debug(f"  → terminal_data: prob={terminal_data['probability']}, dir={terminal_data['direction']}")
             elif self.strategy_mode == StrategyMode.DIGITPAD:
                 digitpad_data = {
                     "digit_frequencies": {str(i): 10.0 for i in range(10)},
@@ -543,6 +563,8 @@ class TradingManager:
                     "signal_text": "Waiting for data...",
                     "signal_type": "neutral"
                 }
+                active_data_type = "digitpad_data"
+                logger.debug(f"  → digitpad_data: even={digitpad_data['even_percentage']}%, odd={digitpad_data['odd_percentage']}%")
             elif self.strategy_mode == StrategyMode.AMT:
                 amt_data = {
                     "growth_rate": 1,
@@ -553,6 +575,8 @@ class TradingManager:
                     "progress": 0.0,
                     "status": "Strategy switched to AMT - Accumulator"
                 }
+                active_data_type = "amt_data"
+                logger.debug(f"  → amt_data: growth_rate={amt_data['growth_rate']}, progress={amt_data['progress']}%")
             elif self.strategy_mode == StrategyMode.SNIPER:
                 sniper_data = {
                     "signal": "WAIT",
@@ -562,6 +586,8 @@ class TradingManager:
                     "confidence": 0.0,
                     "console_log": "Strategy switched to Sniper - High Probability Entry"
                 }
+                active_data_type = "sniper_data"
+                logger.debug(f"  → sniper_data: signal={sniper_data['signal']}, winrate={sniper_data['winrate']}%")
             elif self.strategy_mode == StrategyMode.LDP:
                 ldp_data = {
                     "digit_frequencies": {str(i): 10.0 for i in range(10)},
@@ -571,6 +597,8 @@ class TradingManager:
                     "signal_type": "DIGITOVER",
                     "signal_digit": 5
                 }
+                active_data_type = "ldp_data"
+                logger.debug(f"  → ldp_data: hot={ldp_data['hot_digits']}, cold={ldp_data['cold_digits']}")
             elif self.strategy_mode == StrategyMode.TICK_ANALYZER:
                 tick_analyzer_data = {
                     "streak": 0,
@@ -579,13 +607,19 @@ class TradingManager:
                     "up_ticks": 0,
                     "down_ticks": 0
                 }
+                active_data_type = "tick_analyzer_data"
+                logger.debug(f"  → tick_analyzer_data: streak={tick_analyzer_data['streak']}, momentum={tick_analyzer_data['momentum']}")
             else:
                 multi_indicator_data = {
                     "rsi": 50.0,
                     "trend": "NEUTRAL",
                     "macd": "NEUTRAL",
-                    "confluence": 0
+                    "confluence": 0,
+                    "adx": 0.0,
+                    "signal_strength": "WEAK"
                 }
+                active_data_type = "multi_indicator_data"
+                logger.debug(f"  → multi_indicator_data: rsi={multi_indicator_data['rsi']}, trend={multi_indicator_data['trend']}")
             
             signal_event = SignalEvent(
                 signal_type="STRATEGY_CHANGE",
@@ -604,10 +638,18 @@ class TradingManager:
                 sniper_data=sniper_data,
                 multi_indicator_data=multi_indicator_data
             )
-            get_event_bus().publish("signal", signal_event)
-            logger.info(f"📡 Strategy change broadcasted to dashboard: {strategy_mode_name}")
+            
+            publish_success = get_event_bus().publish("signal", signal_event)
+            
+            if publish_success:
+                logger.info(f"📡 Strategy change broadcasted successfully: "
+                           f"mode={strategy_mode_name}, symbol={current_symbol}, "
+                           f"active_data={active_data_type}")
+            else:
+                logger.warning(f"⚠️ Strategy change publish returned False: mode={strategy_mode_name}")
+                
         except Exception as e:
-            logger.warning(f"Failed to broadcast strategy change: {e}")
+            logger.error(f"❌ Failed to broadcast strategy change: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1784,7 +1826,8 @@ class TradingManager:
                      trend_direction: str, tick_count: int, last_price: float,
                      rsi_value: float, adx_value: float, tick_picker_data: dict,
                      ldp_data: dict, tick_analyzer_data: dict, terminal_data: dict,
-                     digitpad_data: dict, amt_data: dict, sniper_data: dict)
+                     digitpad_data: dict, amt_data: dict, sniper_data: dict,
+                     multi_indicator_data: dict)
         """
         # Default values
         signal = Signal.WAIT
@@ -1802,6 +1845,7 @@ class TradingManager:
         digitpad_data = None
         amt_data = None
         sniper_data = None
+        multi_indicator_data = None  # Added for MULTI_INDICATOR strategy
         
         if self.strategy_mode == StrategyMode.MULTI_INDICATOR:
             # Use Multi-Indicator strategy (default)
@@ -1817,6 +1861,32 @@ class TradingManager:
                 stats = self.strategy.get_stats()
                 tick_count = stats.get('tick_count', 0)
                 last_price = stats.get('last_tick', 0.0)
+                
+                # Prepare multi_indicator_data for SignalEvent
+                macd_signal = "NEUTRAL"
+                macd_histogram = getattr(analysis, 'macd_histogram', None)
+                if macd_histogram is not None:
+                    if macd_histogram > 0:
+                        macd_signal = "BULLISH"
+                    elif macd_histogram < 0:
+                        macd_signal = "BEARISH"
+                
+                confluence = 0
+                if signal == Signal.BUY:
+                    confluence = 3 if confidence >= 0.8 else 2 if confidence >= 0.6 else 1
+                elif signal == Signal.SELL:
+                    confluence = 3 if confidence >= 0.8 else 2 if confidence >= 0.6 else 1
+                
+                multi_indicator_data = {
+                    "rsi": rsi_value,
+                    "trend": trend_direction,
+                    "macd": macd_signal,
+                    "confluence": confluence,
+                    "adx": adx_value,
+                    "signal_strength": "STRONG" if confidence >= 0.8 else "MODERATE" if confidence >= 0.6 else "WEAK"
+                }
+                
+                logger.debug(f"📊 Multi-Indicator data: RSI={rsi_value:.1f}, Trend={trend_direction}, MACD={macd_signal}, Confluence={confluence}")
                 
                 if analysis.tick_picker:
                     tick_picker_data = {
@@ -2150,7 +2220,7 @@ class TradingManager:
         
         return (signal, confidence, reason, trend_direction, tick_count, last_price,
                 rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data,
-                terminal_data, digitpad_data, amt_data, sniper_data)
+                terminal_data, digitpad_data, amt_data, sniper_data, multi_indicator_data)
     
     def _check_and_execute_signal(self):
         """
@@ -2196,7 +2266,7 @@ class TradingManager:
             # Get unified signal from active strategy (based on strategy_mode)
             (signal, confidence, reason, trend_direction, tick_count, last_price,
              rsi_value, adx_value, tick_picker_data, ldp_data, tick_analyzer_data,
-             terminal_data, digitpad_data, amt_data, sniper_data) = self._get_unified_signal()
+             terminal_data, digitpad_data, amt_data, sniper_data, multi_indicator_data) = self._get_unified_signal()
             
             # Current strategy mode name
             strategy_mode_name = self.strategy_mode.value
@@ -2220,9 +2290,11 @@ class TradingManager:
                     terminal_data=terminal_data,
                     digitpad_data=digitpad_data,
                     amt_data=amt_data,
-                    sniper_data=sniper_data
+                    sniper_data=sniper_data,
+                    multi_indicator_data=multi_indicator_data
                 )
                 get_event_bus().publish("signal", signal_event)
+                logger.debug(f"📡 WAIT signal published: strategy={strategy_mode_name}, confidence={confidence:.2f}")
                 return
             
             # Apply entry filter check before executing any trade
@@ -2269,9 +2341,11 @@ class TradingManager:
                         terminal_data=terminal_data,
                         digitpad_data=digitpad_data,
                         amt_data=amt_data,
-                        sniper_data=sniper_data
+                        sniper_data=sniper_data,
+                        multi_indicator_data=multi_indicator_data
                     )
                     get_event_bus().publish("signal", signal_event)
+                    logger.debug(f"📡 FILTERED signal published: strategy={strategy_mode_name}, confidence={confidence:.2f}")
                     return
                 else:
                     filter_stats = self.entry_filter.get_filter_stats()
@@ -2302,9 +2376,11 @@ class TradingManager:
                 terminal_data=terminal_data,
                 digitpad_data=digitpad_data,
                 amt_data=amt_data,
-                sniper_data=sniper_data
+                sniper_data=sniper_data,
+                multi_indicator_data=multi_indicator_data
             )
             get_event_bus().publish("signal", signal_event)
+            logger.info(f"📡 {signal_type} signal published: strategy={strategy_mode_name}, confidence={confidence:.2f}, price={last_price}")
             
             logger.info(f"📊 [{strategy_mode_name}] Signal: {contract_type} | "
                        f"Confidence: {confidence:.2f} | Reason: {reason}")
