@@ -27,8 +27,16 @@ Do not make changes to the file `Y`.
     - **CSS Variables**: Centralized design tokens for easy theming and consistency
 
 ### Technical Implementations
-- **Multi-Indicator Strategy**:
-    - **Indicators**: RSI (14), EMA Crossover (9/21), MACD, Stochastic (14,3), ATR (14).
+- **Trading Strategies (v3.0)**:
+    - **Multi-Indicator**: RSI (14), EMA Crossover (9/21), MACD, Stochastic (14,3), ATR (14). Confluence scoring for signal strength.
+    - **LDP Analyzer**: Last Digit Prediction - Over/Under, Match/Differ, Rise/Fall berdasarkan digit terakhir harga.
+    - **Tick Picker**: Analisis trend tick untuk sinyal BUY/SELL dengan Martingale/Mesamilano.
+    - **Terminal**: Smart Analysis 80% probability dengan 4 level risiko (Low/Medium/High/Very High) + Hybrid Recovery.
+    - **DigitPad**: Prediksi digit 0-9, Even/Odd dengan signals chart.
+    - **AMT (Accumulator)**: Trading accumulator dengan Take Profit/Stop Loss management.
+    - **Sniper**: High probability entry dengan strategy selector.
+    - **Hybrid Money Manager**: Money management aman untuk modal kecil.
+- **Multi-Indicator Strategy Details**:
     - **Signal Generation**: A scoring system evaluates confidence for Buy (CALL) or Sell (PUT) signals based on indicator alignments. Minimum confidence threshold of 0.50.
     - **Advanced Filters (v2.4)**: Multi-Timeframe Trend Confirmation (M5 EMA/RSI), EMA Slope Filter, Enhanced ADX Directional Check, Volume Filter, Price Action Confirmation (wick validation), and a Signal Cooldown System.
     - **Confluence Scoring**: Combines all filter scores (max 100 points) to determine signal strength (STRONG ≥ 70, MEDIUM ≥ 50, WEAK < 50), blocking signals below a minimum confluence score of 50.

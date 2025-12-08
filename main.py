@@ -1862,19 +1862,28 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "strategy_multi":
         if trading_manager:
             result = trading_manager.set_strategy_mode(StrategyMode.MULTI_INDICATOR)
-            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("⬅️ Kembali ke Strategi", callback_data="menu_strategi")]]
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text("❌ Trading manager belum siap. Pastikan sudah login.", parse_mode="Markdown")
         return
 
     elif data == "strategy_ldp":
         if trading_manager:
             result = trading_manager.set_strategy_mode(StrategyMode.LDP)
-            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("⬅️ Kembali ke Strategi", callback_data="menu_strategi")]]
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text("❌ Trading manager belum siap. Pastikan sudah login.", parse_mode="Markdown")
         return
 
     elif data == "strategy_tick":
         if trading_manager:
             result = trading_manager.set_strategy_mode(StrategyMode.TICK_ANALYZER)
-            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("⬅️ Kembali ke Strategi", callback_data="menu_strategi")]]
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text("❌ Trading manager belum siap. Pastikan sudah login.", parse_mode="Markdown")
         return
 
     elif data == "strategy_hybrid":
@@ -1889,25 +1898,37 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "strategy_terminal":
         if trading_manager:
             result = trading_manager.set_strategy_mode(StrategyMode.TERMINAL)
-            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("⬅️ Kembali ke Strategi", callback_data="menu_strategi")]]
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text("❌ Trading manager belum siap. Pastikan sudah login.", parse_mode="Markdown")
         return
 
     elif data == "strategy_digitpad":
         if trading_manager:
             result = trading_manager.set_strategy_mode(StrategyMode.DIGITPAD)
-            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("⬅️ Kembali ke Strategi", callback_data="menu_strategi")]]
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text("❌ Trading manager belum siap. Pastikan sudah login.", parse_mode="Markdown")
         return
 
     elif data == "strategy_amt":
         if trading_manager:
             result = trading_manager.set_strategy_mode(StrategyMode.AMT)
-            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("⬅️ Kembali ke Strategi", callback_data="menu_strategi")]]
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text("❌ Trading manager belum siap. Pastikan sudah login.", parse_mode="Markdown")
         return
 
     elif data == "strategy_sniper":
         if trading_manager:
             result = trading_manager.set_strategy_mode(StrategyMode.SNIPER)
-            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("⬅️ Kembali ke Strategi", callback_data="menu_strategi")]]
+            await query.edit_message_text(f"✅ {result}", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text("❌ Trading manager belum siap. Pastikan sudah login.", parse_mode="Markdown")
         return
         
     elif data == "akun_refresh":
